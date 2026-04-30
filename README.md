@@ -1,0 +1,2 @@
+- **Hướng dẫn khởi chạy:** README rõ ràng, đủ để người chấm có thể clone repository và chạy được hệ thống mà không cần hỏi thêm.
+- **Dữ liệu mẫu:** Seed data hoặc script tạo dữ liệu ban đầu để có thể thao tác và kiểm tra ngay sau khi khởi chạy.
