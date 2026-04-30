@@ -1,0 +1,25 @@
+{
+  "name": "unihub-workshop",
+  "version": "0.0.0",
+  "private": true,
+  "description": "UniHub Workshop monorepo",
+  "scripts": {
+    "dev:sv": "pnpm --filter @unihub/web-sv dev",
+    "dev:admin": "pnpm --filter @unihub/web-admin dev",
+    "build": "pnpm -r --filter \"./apps/*\" --filter \"./packages/*\" build",
+    "build:web": "pnpm --filter @unihub/web-sv --filter @unihub/web-admin build",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "pnpm -r lint",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md,css,html}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md,css,html}\""
+  },
+  "devDependencies": {
+    "prettier": "^3.3.3",
+    "typescript": "^5.6.3"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=10.0.0"
+  },
+  "packageManager": "pnpm@10.33.2"
+}
