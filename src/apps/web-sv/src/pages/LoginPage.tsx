@@ -3,7 +3,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
-// import { ApiError } from '@unihub/api-client';
+import { ApiError } from '@unihub/api-client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -45,10 +45,10 @@ export function LoginPage() {
         res.user,
       );
       const from = (location.state as { from?: { pathname: string } } | null)?.from?.pathname;
-      navigate(from ?? '/workshops', { replace: true });
+      navigate(from ?? '/', { replace: true });
     } catch (e) {
-      // if (e instanceof ApiError) setServerError(e.message);
-      setServerError('Không thể đăng nhập. Vui lòng thử lại.');
+      if (e instanceof ApiError) setServerError(e.message);
+      else setServerError('Không thể đăng nhập. Vui lòng thử lại.');
     }
   };
 
@@ -57,9 +57,7 @@ export function LoginPage() {
       <Card>
         <CardHeader>
           <CardTitle>Đăng nhập</CardTitle>
-          <p className="mt-1 text-sm text-slate-500">
-            Vui lòng đăng nhập để tiếp tục.
-          </p>
+          <p className="mt-1 text-sm text-slate-500">Vui lòng đăng nhập để tiếp tục.</p>
         </CardHeader>
         <CardContent>
           <form className="space-y-4" onSubmit={handleSubmit(onSubmit)} noValidate>
@@ -87,9 +85,7 @@ export function LoginPage() {
                 autoComplete="current-password"
                 {...register('password')}
               />
-              {errors.password && (
-                <p className="text-xs text-red-600">{errors.password.message}</p>
-              )}
+              {errors.password && <p className="text-xs text-red-600">{errors.password.message}</p>}
             </div>
 
             {serverError && (
@@ -98,7 +94,12 @@ export function LoginPage() {
               </div>
             )}
 
-            <Button type="submit" size="lg" className="w-full cursor-pointer" disabled={isSubmitting}>
+            <Button
+              type="submit"
+              size="lg"
+              className="w-full cursor-pointer"
+              disabled={isSubmitting}
+            >
               {isSubmitting ? 'Đang đăng nhập…' : 'Đăng nhập'}
             </Button>
 

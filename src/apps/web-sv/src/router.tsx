@@ -1,0 +1,48 @@
+import { createBrowserRouter, Navigate } from 'react-router-dom';
+import { Layout } from '@/components/Layout';
+import { RequireAuth } from '@/components/RequireAuth';
+import { HomePage } from '@/pages/HomePage';
+import { LoginPage } from '@/pages/LoginPage';
+import { WorkshopListPage } from '@/pages/WorkshopListPage';
+import { WorkshopDetailPage } from '@/pages/WorkshopDetailPage';
+import { MyRegistrationsPage } from '@/pages/MyRegistrationsPage';
+import { QrPage } from '@/pages/QrPage';
+import { NotFoundPage } from '@/pages/NotFoundPage';
+
+export const router = createBrowserRouter([
+  {
+    path: '/',
+    element: <Layout />,
+    children: [
+      { index: true, element: <HomePage /> },
+      { path: 'workshops', element: <WorkshopListPage /> },
+      { path: 'workshops/:id', element: <WorkshopDetailPage /> },
+      { path: 'login', element: <LoginPage /> },
+      {
+        path: 'me',
+        element: (
+          <RequireAuth>
+            <Navigate to="/me/registrations" replace />
+          </RequireAuth>
+        ),
+      },
+      {
+        path: 'me/registrations',
+        element: (
+          <RequireAuth>
+            <MyRegistrationsPage />
+          </RequireAuth>
+        ),
+      },
+      {
+        path: 'me/registrations/:id/qr',
+        element: (
+          <RequireAuth>
+            <QrPage />
+          </RequireAuth>
+        ),
+      },
+      { path: '*', element: <NotFoundPage /> },
+    ],
+  },
+]);
