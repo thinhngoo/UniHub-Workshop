@@ -9,18 +9,21 @@ const features = [
     icon: CalendarDays,
     title: 'Lịch workshop',
     desc: 'Xem số chỗ, diễn giả, phòng và sơ đồ phòng.',
+    to: '/workshops',
   },
   {
     icon: ScanLine,
     title: 'Mã QR check-in',
     desc: 'Sau khi đăng ký, nhận mã QR cá nhân để check-in.',
+    to: '/me/registrations',
   },
   {
     icon: ShieldCheck,
     title: 'Thanh toán',
     desc: 'Thanh toán trực tiếp qua hệ thống thanh toán của trường.',
+    to: '/workshops',
   },
-];
+] as const;
 
 export function HomePage() {
   return (
@@ -59,16 +62,24 @@ export function HomePage() {
       </section>
 
       <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {features.map(({ icon: Icon, title, desc }) => (
-          <Card key={title} className="cursor-pointer">
-            <CardContent className="space-y-3">
-              <div className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-brand-100 text-brand-700">
-                <Icon className="size-5" />
-              </div>
-              <h3 className="font-semibold text-slate-900">{title}</h3>
-              <p className="text-sm text-slate-600">{desc}</p>
-            </CardContent>
-          </Card>
+        {features.map(({ icon: Icon, title, desc, to }) => (
+          <Link
+            key={title}
+            to={to}
+            className={cn(
+              'group rounded-xl outline-none ring-offset-2 ring-offset-slate-50 focus-visible:ring-2 focus-visible:ring-brand-500',
+            )}
+          >
+            <Card className="h-full cursor-pointer transition-colors hover:border-brand-200 hover:shadow-sm">
+              <CardContent className="flex h-full flex-col gap-3">
+                <div className="inline-flex size-10 items-center justify-center rounded-lg bg-brand-100 text-brand-700 transition-colors group-hover:bg-brand-200">
+                  <Icon className="size-5" />
+                </div>
+                <h3 className="font-semibold text-slate-900">{title}</h3>
+                <p className="text-sm text-slate-600">{desc}</p>
+              </CardContent>
+            </Card>
+          </Link>
         ))}
       </section>
     </div>
