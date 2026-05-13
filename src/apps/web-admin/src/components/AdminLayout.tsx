@@ -6,12 +6,12 @@ import { cn } from '@/lib/utils';
 
 const navItem = ({ isActive }: { isActive: boolean }) =>
   cn(
-    'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+    'flex items-center gap-3 rounded-lg px-3 !py-3 lg:!py-2 text-sm font-medium transition-colors rounded-none lg:rounded-md',
     isActive ? 'bg-brand-100 text-brand-700' : 'text-slate-700 hover:bg-slate-100',
   );
 
 const mobileNavItem = ({ isActive }: { isActive: boolean }) =>
-  cn(navItem({ isActive }), 'min-w-0 flex-1 justify-center gap-1.5');
+  cn(navItem({ isActive }), 'min-w-0 flex-1 justify-center gap-1.5 px-2 py-2');
 
 export function AdminLayout() {
   const { user, hasAdminAccess, clear } = useAuth();
@@ -25,7 +25,7 @@ export function AdminLayout() {
   if (!hasAdminAccess) {
     return (
       <div className="min-h-screen flex items-center justify-center p-6">
-        <div className="max-w-md rounded-xl border border-red-200 bg-red-50 p-6 text-red-900">
+        <div className="max-w-md rounded-xl border border-red-200 bg-red-50 p-6 text-red-700">
           <div className="flex items-center gap-2 font-semibold">
             <ShieldAlert className="h-5 w-5" />
             Truy cập bị từ chối
@@ -95,11 +95,11 @@ export function AdminLayout() {
             <Link to="/" className="font-semibold">
               UniHub Admin
             </Link>
-            <Button variant="ghost" size="sm" onClick={handleLogout}>
+            <Button variant="ghost" size="icon" className="cursor-pointer" onClick={handleLogout}>
               <LogOut className="size-4" />
             </Button>
           </div>
-          <nav className="flex w-full gap-1 px-2 pb-2">
+          <nav className="flex w-full border-t border-slate-200">
             <NavLink to="/" end className={mobileNavItem}>
               <LayoutDashboard className="size-4 shrink-0" />
               Tổng quan
