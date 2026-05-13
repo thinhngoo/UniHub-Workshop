@@ -6,7 +6,7 @@
   "scripts": {
     "dev:sv": "pnpm --filter @unihub/web-sv dev",
     "dev:admin": "pnpm --filter @unihub/web-admin dev",
-    "build": "pnpm -r --filter \"./apps/*\" --filter \"./packages/*\" build",
+    "dev:api": "pnpm --filter @unihub/api start:dev",
     "build:web": "pnpm --filter @unihub/web-sv --filter @unihub/web-admin build",
     "typecheck": "pnpm -r typecheck",
     "lint": "pnpm -r lint",

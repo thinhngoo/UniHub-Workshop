@@ -47,8 +47,8 @@ export function LoginPage() {
       const from = (location.state as { from?: { pathname: string } } | null)?.from?.pathname;
       navigate(from ?? '/workshops', { replace: true });
     } catch (e) {
-      if (e instanceof ApiError) setServerError(e.message);
-      else setServerError('Không thể đăng nhập. Vui lòng thử lại.');
+      // if (e instanceof ApiError) setServerError(e.message);
+      setServerError('Không thể đăng nhập. Vui lòng thử lại.');
     }
   };
 
