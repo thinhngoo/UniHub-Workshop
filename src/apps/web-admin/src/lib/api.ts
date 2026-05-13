@@ -1,4 +1,5 @@
 import {
+  adminApi,
   authApi,
   createApiClient,
   notificationsApi,
@@ -42,4 +43,5 @@ export const api = {
   workshops: workshopsApi(http),
   registrations: registrationsApi(http),
   notifications: notificationsApi(http),
+  admin: adminApi(http),
 };

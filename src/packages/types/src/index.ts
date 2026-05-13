@@ -5,3 +5,4 @@ export * from './registration.js';
 export * from './payment.js';
 export * from './checkin.js';
 export * from './notification.js';
+export * from './admin.js';
