@@ -1,4 +1,4 @@
-import type { ISODateString, UUID } from './common';
+import type { ISODateString, UUID } from './common.js';
 
 export type RoleCode = 'student' | 'organizer' | 'checkin_staff' | 'admin';
 export type UserStatus = 'active' | 'disabled';

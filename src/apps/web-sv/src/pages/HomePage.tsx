@@ -28,7 +28,7 @@ const features = [
 export function HomePage() {
   return (
     <div className="space-y-12">
-      <section className="rounded-3xl bg-linear-to-br from-brand-600 via-brand-500 to-brand-700 px-6 py-16 sm:px-12 text-white shadow-lg cursor-default">
+      <section className="rounded-3xl bg-linear-to-br from-brand-600 via-brand-500 to-brand-700 px-6 py-16 sm:px-12 text-white shadow-lg">
         <div className="max-w-3xl space-y-5">
           <span className="inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-xs font-medium backdrop-blur">
             Tuần lễ kỹ năng và nghề nghiệp

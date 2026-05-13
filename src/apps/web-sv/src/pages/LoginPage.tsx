@@ -3,7 +3,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
-import { ApiError } from '@unihub/api-client';
+// import { ApiError } from '@unihub/api-client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -98,7 +98,7 @@ export function LoginPage() {
               </div>
             )}
 
-            <Button type="submit" size="lg" className="w-full" disabled={isSubmitting}>
+            <Button type="submit" size="lg" className="w-full cursor-pointer" disabled={isSubmitting}>
               {isSubmitting ? 'Đang đăng nhập…' : 'Đăng nhập'}
             </Button>
 
