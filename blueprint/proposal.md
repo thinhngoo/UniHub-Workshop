@@ -33,14 +33,14 @@ Xây dựng hệ thống UniHub Workshop số hóa toàn bộ quy trình từ đ
 
 - **Số hóa end-to-end**: Loại bỏ hoàn toàn khâu xử lý thủ công trong đăng ký, xác nhận, thanh toán, thông báo và check-in.
 - **Functional**:
-	- **Nhất quán tuyệt đối về chỗ ngồi**: Đảm bảo không có hai sinh viên nào **cùng nhận chung 1 chỗ** của bất kỳ workshop nào (strong consistency), kể cả khi request đến đồng thời.
-	- **An toàn giao dịch**: Đảm bảo mỗi giao dịch thanh toán chỉ được **thực hiện đúng một lần**, ngay cả khi client retry nhiều lần hoặc cổng thanh toán gặp sự cố.
 	- **Check-in liên tục kể cả offline**: Mobile app check-in phải hoạt động ngay cả khi **mất kết nối mạng**; dữ liệu tự đồng bộ khi mạng trở lại và **không được mất**.
 	- **Đồng bộ dữ liệu sinh viên an toàn**: Tự động nhập CSV hằng đêm, xử lý được file lỗi / dữ liệu trùng / thiếu cột mà không làm gián đoạn hệ thống đang chạy.
 	- **Phân quyền chặt chẽ**: Ba nhóm người dùng (sinh viên, ban tổ chức, nhân sự check-in) có phạm vi truy cập khác biệt rõ ràng.
 	- **Thông báo có thể mở rộng**: Hệ thống thông báo hỗ trợ app + email ngay từ đầu, và **dễ dàng bổ sung kênh mới** (ví dụ Telegram) trong các học kỳ sau mà không cần thay đổi lớn về kiến trúc.
 	- **AI Summary cho workshop**: Cho phép ban tổ chức upload PDF giới thiệu workshop; hệ thống tự động trích xuất, làm sạch và sinh bản tóm tắt hiển thị trên trang chi tiết workshop.
 - **Non-functional**:
+	- **Nhất quán tuyệt đối về chỗ ngồi**: Đảm bảo không có hai sinh viên nào **cùng nhận chung 1 chỗ** của bất kỳ workshop nào (strong consistency), kể cả khi request đến đồng thời.
+	- **An toàn giao dịch**: Đảm bảo mỗi giao dịch thanh toán chỉ được **thực hiện đúng một lần**, ngay cả khi client retry nhiều lần hoặc cổng thanh toán gặp sự cố.
 	- **Chịu tải đột biến**: Hỗ trợ tối thiểu **12.000 sinh viên** truy cập trong **10 phút đầu** khi mở đăng ký (trong đó **60% dồn vào 3 phút đầu tiên**) mà không downtime, không mất dữ liệu và đảm bảo công bằng giữa các sinh viên.
 	- **Cô lập sự cố thanh toán**: Khi cổng thanh toán lỗi kéo dài, các tính năng không liên quan (xem lịch, xem thông tin workshop, workshop miễn phí…) vẫn phải hoạt động bình thường.
 
