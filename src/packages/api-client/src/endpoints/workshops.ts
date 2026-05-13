@@ -31,8 +31,8 @@ export const workshopsApi = (http: AxiosInstance) => ({
       })
       .then((r) => r.data);
   },
-  triggerAiSummary: (id: UUID) =>
+  triggerSummary: (id: UUID) =>
     http
-      .post<{ status: 'pending' }>(`/workshops/${id}/ai-summary`)
+      .post<{ status: 'pending' }>(`/workshops/${id}/summary`)
       .then((r) => r.data),
 });

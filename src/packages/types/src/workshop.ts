@@ -1,7 +1,7 @@
 import type { ISODateString, UUID } from './common.js';
 
 export type WorkshopStatus = 'draft' | 'published' | 'cancelled';
-export type AiSummaryStatus = 'none' | 'pending' | 'ready' | 'failed';
+export type SummaryStatus = 'none' | 'pending' | 'ready' | 'failed';
 
 export interface Workshop {
   id: UUID;
@@ -16,8 +16,8 @@ export interface Workshop {
   isPaid: boolean;
   price: number | null;
   status: WorkshopStatus;
-  aiSummary: string | null;
-  aiSummaryStatus: AiSummaryStatus;
+  summary: string | null;
+  summaryStatus: SummaryStatus;
   version: number;
   createdAt: ISODateString;
   updatedAt: ISODateString;

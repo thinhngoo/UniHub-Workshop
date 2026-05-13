@@ -118,7 +118,7 @@ function Header() {
 
 function Footer() {
   return (
-    <footer className="border-t border-slate-200 bg-white py-6 cursor-default">
+    <footer className="border-t border-slate-200 bg-white py-6">
       <div className="container-app text-xs text-slate-500 flex flex-col sm:flex-row gap-2 sm:items-center sm:justify-between">
         <span>© {new Date().getFullYear()} UniHub Workshop · Tuần lễ kỹ năng và nghề nghiệp</span>
         <span>Developed by Byron</span>
