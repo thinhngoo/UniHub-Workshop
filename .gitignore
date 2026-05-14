@@ -1,12 +1,29 @@
-# Basic
+# Dependencies
 node_modules/
+
+# Environment & secrets
 .env
+.env*.local
+
+# Logs
 *.log
-dist/
-build/
+
+# Build & caches
 .cache/
+build/
+dist/
+
+# Turborepo
 .turbo/
+
+# TypeScript
 *.tsbuildinfo
 
-# Custom
+# Expo (mobile-checkin)
+src/apps/mobile-checkin/.expo/
+src/apps/mobile-checkin/android/
+src/apps/mobile-checkin/ios/
+src/apps/mobile-checkin/web-build/
+
+# Project conventions
 _*
