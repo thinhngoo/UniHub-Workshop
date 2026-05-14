@@ -1,3 +1,5 @@
+import Constants from 'expo-constants';
+
 /**
  * Local QR verification (design.md §3.1 + ADR-9).
  *
@@ -7,8 +9,15 @@
  * check on shape so the scanner doesn't enqueue obvious garbage into the
  * outbox.
  */
+function resolveQrTokenPrefix(): string {
+  const fromExtra = (
+    Constants.expoConfig?.extra as { qrTokenPrefix?: string } | undefined
+  )?.qrTokenPrefix?.trim();
+  if (fromExtra) return fromExtra;
+  return 'qrtok_';
+}
 
-const TOKEN_PREFIX = 'qrtok_';
+const TOKEN_PREFIX = resolveQrTokenPrefix();
 const MAX_LENGTH = 256;
 
 export interface QrVerifyResult {
@@ -30,7 +39,7 @@ export function verifyQr(raw: string): QrVerifyResult {
     return {
       ok: false,
       token,
-      reason: `Sai định dạng (cần bắt đầu bằng "${TOKEN_PREFIX}").`,
+      reason: `Không phải mã QR hợp lệ.`,
     };
   }
   return { ok: true, token };
