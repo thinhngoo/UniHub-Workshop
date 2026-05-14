@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -9,6 +9,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import Swipeable from 'react-native-gesture-handler/Swipeable';
 import { useFocusEffect } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError } from '@unihub/api-client';
@@ -18,6 +19,7 @@ import { colors } from '@/lib/colors';
 import { formatDateTime, shorten } from '@/lib/format';
 import {
   clearSynced,
+  deleteOne,
   listAll,
   listPending,
   markBatchFailed,
@@ -117,6 +119,51 @@ export default function QueueScreen() {
     );
   }, [qc]);
 
+  const syncOneItem = useCallback(
+    async (item: OutboxRow) => {
+      try {
+        const res = await api.checkin.batch(
+          {
+            items: [
+              {
+                clientEventId: item.clientEventId,
+                qrToken: item.qrToken,
+                scannedAt: item.scannedAt,
+              },
+            ],
+          },
+          newUuid(),
+        );
+        const result = res.results[0];
+        await markResults([
+          {
+            clientEventId: item.clientEventId,
+            status: result ? 'sent' : 'failed',
+            resultStatus: result?.status ?? null,
+            registrationId: result?.registrationId ?? null,
+            message: result?.message ?? null,
+          },
+        ]);
+      } catch (e) {
+        const message =
+          e instanceof ApiError
+            ? `${e.code}: ${e.message}`
+            : ((e as Error)?.message ?? 'unknown_error');
+        await markBatchFailed([item.clientEventId], message);
+      }
+      void qc.invalidateQueries({ queryKey: QUEUE_KEY });
+    },
+    [qc],
+  );
+
+  const deleteOneItem = useCallback(
+    async (item: OutboxRow) => {
+      await deleteOne(item.clientEventId);
+      void qc.invalidateQueries({ queryKey: QUEUE_KEY });
+    },
+    [qc],
+  );
+
   const rows = rowsQuery.data ?? [];
   const pendingCount = rows.filter((r) => r.status === 'pending').length;
   const sentCount = rows.filter((r) => r.status === 'sent').length;
@@ -165,18 +212,23 @@ export default function QueueScreen() {
         refreshControl={
           <RefreshControl
             refreshing={rowsQuery.isRefetching}
-            onRefresh={() => void rowsQuery.refetch()}
+            onRefresh={() => {
+              setError(null);
+              void rowsQuery.refetch();
+            }}
           />
         }
         ListEmptyComponent={
           <View style={styles.empty}>
             <Text style={styles.emptyTitle}>Chưa có mục nào</Text>
             <Text style={styles.emptyBody}>
-              Quay lại tab Quét QR để thêm sự kiện check-in vào hàng đợi.
+              Quét QR để thêm lượt check-in vào hàng đợi.
             </Text>
           </View>
         }
-        renderItem={({ item }) => <Row item={item} />}
+        renderItem={({ item }) => (
+          <Row item={item} onSync={syncOneItem} onDelete={deleteOneItem} />
+        )}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
       />
 
@@ -189,23 +241,69 @@ export default function QueueScreen() {
   );
 }
 
-function Row({ item }: { item: OutboxRow }) {
+function Row({
+  item,
+  onSync,
+  onDelete,
+}: {
+  item: OutboxRow;
+  onSync: (item: OutboxRow) => Promise<void>;
+  onDelete: (item: OutboxRow) => Promise<void>;
+}) {
+  const ref = useRef<Swipeable>(null);
   const headline = headlineFor(item);
+  const canSync = item.status === 'pending' || item.status === 'failed';
+
+  const renderLeftActions = canSync
+    ? () => (
+        <TouchableOpacity
+          style={styles.actionSync}
+          onPress={() => {
+            ref.current?.close();
+            void onSync(item);
+          }}
+        >
+          <Text style={styles.actionText}>Đồng bộ</Text>
+        </TouchableOpacity>
+      )
+    : undefined;
+
+  const renderRightActions = () => (
+    <TouchableOpacity
+      style={styles.actionDelete}
+      onPress={() => {
+        ref.current?.close();
+        void onDelete(item);
+      }}
+    >
+      <Text style={styles.actionText}>Xóa</Text>
+    </TouchableOpacity>
+  );
+
   return (
-    <View style={styles.row}>
-      <View style={[styles.statusDot, { backgroundColor: headline.color }]} />
-      <View style={styles.rowBody}>
-        <Text style={styles.rowTitle}>{headline.label}</Text>
-        <Text style={styles.rowSub}>
-          {shorten(item.qrToken, 12, 4)} · {formatDateTime(item.scannedAt)}
-        </Text>
-        {item.message && (
-          <Text style={styles.rowMessage} numberOfLines={2}>
-            {item.message}
+    <Swipeable
+      ref={ref}
+      renderLeftActions={renderLeftActions}
+      renderRightActions={renderRightActions}
+      friction={2}
+      overshootLeft={false}
+      overshootRight={false}
+    >
+      <View style={styles.row}>
+        <View style={[styles.statusDot, { backgroundColor: headline.color }]} />
+        <View style={styles.rowBody}>
+          <Text style={styles.rowTitle}>{headline.label}</Text>
+          <Text style={styles.rowSub}>
+            {shorten(item.qrToken, 12, 4)} · {formatDateTime(item.scannedAt)}
           </Text>
-        )}
+          {item.message && (
+            <Text style={styles.rowMessage} numberOfLines={2}>
+              {item.message}
+            </Text>
+          )}
+        </View>
       </View>
-    </View>
+    </Swipeable>
   );
 }
 
@@ -293,6 +391,23 @@ const styles = StyleSheet.create({
   rowTitle: { fontSize: 14, fontWeight: '600', color: colors.text },
   rowSub: { fontSize: 12, color: colors.textMuted },
   rowMessage: { fontSize: 12, color: colors.textMuted, marginTop: 2 },
+  actionSync: {
+    backgroundColor: colors.brand,
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: 76,
+    borderTopLeftRadius: 12,
+    borderBottomLeftRadius: 12,
+  },
+  actionDelete: {
+    backgroundColor: colors.danger,
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: 76,
+    borderTopRightRadius: 12,
+    borderBottomRightRadius: 12,
+  },
+  actionText: { color: '#fff', fontWeight: '700', fontSize: 13 },
   footerBtn: {
     margin: 12,
     padding: 12,

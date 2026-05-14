@@ -25,6 +25,17 @@ export default function ScanScreen() {
 
   // Track last-seen token to debounce — useRef so we don't re-render on writes.
   const lastScanRef = useRef<{ token: string; at: number }>({ token: '', at: 0 });
+  const bannerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showBanner = useCallback((next: Banner) => {
+    if (bannerTimerRef.current) clearTimeout(bannerTimerRef.current);
+    setBanner(next);
+    bannerTimerRef.current = setTimeout(() => setBanner(null), 2_000);
+  }, []);
+
+  useEffect(() => () => {
+    if (bannerTimerRef.current) clearTimeout(bannerTimerRef.current);
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
@@ -48,7 +59,7 @@ export default function ScanScreen() {
 
     const result = verifyQr(data);
     if (!result.ok) {
-      setBanner({
+      showBanner({
         tone: 'danger',
         title: 'QR không hợp lệ',
         detail: result.reason,
@@ -62,19 +73,19 @@ export default function ScanScreen() {
         qrToken: result.token,
         scannedAt: new Date().toISOString(),
       });
-      setBanner({
+      showBanner({
         tone: 'success',
         title: 'Đã ghi vào hàng đợi',
         detail: result.token,
       });
     } catch (e) {
-      setBanner({
+      showBanner({
         tone: 'danger',
         title: 'Lỗi lưu outbox',
         detail: (e as Error)?.message,
       });
     }
-  }, []);
+  }, [showBanner]);
 
   const onLogout = useCallback(() => {
     Alert.alert('Đăng xuất', 'Bạn chắc chắn muốn đăng xuất?', [
@@ -137,14 +148,16 @@ export default function ScanScreen() {
         </View>
 
         <View style={styles.bottomBar}>
-          {banner ? (
-            <BannerCard banner={banner} onDismiss={() => setBanner(null)} />
-          ) : (
-            <Text style={styles.bottomHint}>
-              Đã quét sẽ vào hàng đợi offline; điều hướng đến tab &quot;Hàng đợi&quot; để đồng bộ.
-            </Text>
-          )}
+          <Text style={styles.bottomHint}>
+            Đã quét sẽ vào hàng đợi offline; điều hướng đến tab &quot;Hàng đợi&quot; để đồng bộ.
+          </Text>
         </View>
+
+        {banner && (
+          <View style={styles.bannerWrap} pointerEvents="box-none">
+            <BannerCard banner={banner} onDismiss={() => setBanner(null)} />
+          </View>
+        )}
       </View>
     </View>
   );
@@ -248,6 +261,13 @@ const styles = StyleSheet.create({
     textShadowRadius: 4,
   },
   bottomBar: { paddingBottom: 40 },
+  bannerWrap: {
+    position: 'absolute',
+    bottom: 40,
+    left: 0,
+    right: 0,
+    paddingHorizontal: 16,
+  },
   bottomHint: {
     color: '#fff',
     fontSize: 12,
