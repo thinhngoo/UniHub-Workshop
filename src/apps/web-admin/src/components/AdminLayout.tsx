@@ -2,7 +2,7 @@ import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { CalendarDays, LayoutDashboard, ListChecks, LogOut, ShieldAlert } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
+import { cn } from '@unihub/format/cn';
 
 const navItem = ({ isActive }: { isActive: boolean }) =>
   cn(

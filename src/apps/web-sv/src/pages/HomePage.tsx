@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import { CalendarDays, ScanLine, ShieldCheck } from 'lucide-react';
 import { buttonVariants } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { cn } from '@/lib/utils';
+import { cn } from '@unihub/format/cn';
 
 const features = [
   {

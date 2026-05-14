@@ -3,7 +3,7 @@ import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-do
 import { CalendarDays, LogIn, LogOut, Menu, Ticket, User as UserIcon } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
+import { cn } from '@unihub/format/cn';
 
 const menuItemBase =
   'flex w-full items-center gap-2 px-3 py-2.5 text-sm font-medium transition-colors rounded-md';

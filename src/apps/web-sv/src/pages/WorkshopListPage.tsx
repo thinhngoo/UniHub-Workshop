@@ -7,7 +7,7 @@ import { api } from '@/lib/api';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { formatCurrencyVND, formatDateTime } from '@/lib/utils';
+import { formatCurrencyVND, formatDateTime } from '@unihub/format';
 
 export function WorkshopListPage() {
   const [search, setSearch] = useState('');

@@ -6,7 +6,8 @@ import { api } from '@/lib/api';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
-import { cn, formatCurrencyVND, formatDateTime } from '@/lib/utils';
+import { formatCurrencyVND, formatDateTime } from '@unihub/format';
+import { cn } from '@unihub/format/cn';
 
 const STATUS_TONE: Record<WorkshopStatus, 'success' | 'warning' | 'danger' | 'neutral'> = {
   published: 'success',
@@ -37,7 +38,7 @@ export function WorkshopsPage() {
         </div>
 
         <Link to="/workshops/new" className={cn(buttonVariants(), 'gap-2')}>
-          <Plus className="h-4 w-4" />
+          <Plus className="size-4" />
           Tạo workshop
         </Link>
       </div>
@@ -91,7 +92,7 @@ export function WorkshopsPage() {
                   <td className="px-4 py-3 text-right">
                     <Link to={`/workshops/${w.id}/edit`}>
                       <Button variant="ghost" size="sm" className="cursor-pointer">
-                        <Pencil className="h-4 w-4" />
+                        <Pencil className="size-4" />
                         Sửa
                       </Button>
                     </Link>

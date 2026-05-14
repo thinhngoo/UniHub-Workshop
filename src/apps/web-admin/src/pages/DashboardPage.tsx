@@ -23,7 +23,8 @@ import { api } from '@/lib/api';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { cn, formatCurrencyVND, formatDateTime } from '@/lib/utils';
+import { formatCurrencyVND, formatDateTime } from '@unihub/format';
+import { cn } from '@unihub/format/cn';
 
 const REGISTRATION_LABEL: Record<RegistrationStatus, string> = {
   confirmed: 'Đã xác nhận',

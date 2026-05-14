@@ -5,7 +5,7 @@ import type { Registration } from '@unihub/types';
 import { api } from '@/lib/api';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { formatDateTime } from '@/lib/utils';
+import { formatDateTime } from '@unihub/format';
 
 const STATUS_TONE: Record<Registration['status'], 'success' | 'warning' | 'danger' | 'neutral'> = {
   confirmed: 'success',

@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/lib/auth';
-import { formatCurrencyVND, formatDateTime } from '@/lib/utils';
+import { formatCurrencyVND, formatDateTime } from '@unihub/format';
 
 export function WorkshopDetailPage() {
   const { id } = useParams<{ id: string }>();
