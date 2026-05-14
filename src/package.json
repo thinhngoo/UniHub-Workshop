@@ -7,6 +7,7 @@
     "dev:sv": "pnpm --filter @unihub/web-sv dev",
     "dev:admin": "pnpm --filter @unihub/web-admin dev",
     "dev:api": "pnpm --filter @unihub/api start:dev",
+    "dev:checkin": "pnpm --filter @unihub/mobile-checkin start",
     "build:web": "pnpm --filter @unihub/web-sv --filter @unihub/web-admin build",
     "typecheck": "pnpm -r typecheck",
     "lint": "pnpm -r lint",

@@ -27,3 +27,4 @@ src/apps/mobile-checkin/web-build/
 
 # Project conventions
 _*
+!_*.tsx

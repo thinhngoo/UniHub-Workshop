@@ -1,0 +1,34 @@
+{
+  "expo": {
+    "name": "UniHub Check-in",
+    "slug": "unihub-mobile-checkin",
+    "scheme": "unihubcheckin",
+    "version": "0.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": false,
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "edu.unihub.checkin",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Ứng dụng cần quyền truy cập camera để quét mã QR check-in."
+      }
+    },
+    "android": {
+      "package": "edu.unihub.checkin",
+      "permissions": ["android.permission.CAMERA"]
+    },
+    "web": {
+      "bundler": "metro"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Ứng dụng cần quyền truy cập camera để quét mã QR check-in."
+        }
+      ]
+    ]
+  }
+}
