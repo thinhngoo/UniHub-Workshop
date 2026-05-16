@@ -1,6 +1,6 @@
 import type { ISODateString, UUID } from './common.js';
 
-export type RoleCode = 'student' | 'organizer' | 'checkin_staff' | 'admin';
+export type RoleCode = 'student' | 'organizer' | 'staff' | 'admin';
 export type UserStatus = 'active' | 'disabled';
 
 export interface User {
@@ -9,7 +9,7 @@ export interface User {
   email: string;
   fullName: string;
   status: UserStatus;
-  roles: RoleCode[];
+  role: RoleCode;
   createdAt: ISODateString;
   updatedAt: ISODateString;
 }

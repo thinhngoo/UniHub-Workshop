@@ -40,9 +40,7 @@ export default function LoginScreen() {
         email: email.trim(),
         password,
       });
-      const allowed = res.user.roles.some(
-        (r) => r === 'checkin_staff' || r === 'admin',
-      );
+      const allowed = res.user.role === 'staff' || res.user.role === 'admin';
       if (!allowed) {
         setError('Tài khoản này không có quyền truy cập.');
         return;
@@ -73,10 +71,7 @@ export default function LoginScreen() {
   };
 
   const showHint = () =>
-    Alert.alert(
-      'Tài khoản',
-      'staff@unihub.edu.vn / staff1234\nadmin@unihub.edu.vn / admin123',
-    );
+    Alert.alert('Tài khoản', 'staff@unihub.edu.vn / staff1234\nadmin@unihub.edu.vn / admin123');
 
   return (
     <KeyboardAvoidingView
@@ -96,9 +91,7 @@ export default function LoginScreen() {
 
         <View style={styles.card}>
           <Text style={styles.heading}>Đăng nhập</Text>
-          <Text style={styles.helper}>
-            Sử dụng tài khoản được cấp cho bạn.
-          </Text>
+          <Text style={styles.helper}>Sử dụng tài khoản được cấp cho bạn.</Text>
 
           <View style={styles.field}>
             <Text style={styles.label}>Email</Text>

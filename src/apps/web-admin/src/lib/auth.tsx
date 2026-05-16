@@ -49,7 +49,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     () => ({
       user,
       isAuthenticated: !!user,
-      hasAdminAccess: !!user && user.roles.some((r) => ALLOWED_ROLES.includes(r)),
+      hasAdminAccess: !!user && ALLOWED_ROLES.includes(user.role),
       setSession,
       clear,
     }),

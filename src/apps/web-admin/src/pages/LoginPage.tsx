@@ -38,7 +38,8 @@ export function LoginPage() {
     setServerError(null);
     try {
       const res = await api.auth.login(values);
-      const allowed = res.user.roles.some((r) => r === 'admin' || r === 'organizer');
+      const allowed =
+        res.user.role === 'admin' || res.user.role === 'organizer';
       if (!allowed) {
         setServerError('Tài khoản này không có quyền truy cập.');
         return;
