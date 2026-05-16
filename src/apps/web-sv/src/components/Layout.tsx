@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { CalendarDays, LogIn, LogOut, Menu, Ticket, User as UserIcon } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
+import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { cn } from '@unihub/format/cn';
 
@@ -30,7 +31,7 @@ export function Layout() {
 }
 
 function Header() {
-  const { isAuthenticated, clear } = useAuth();
+  const { isReady, isAuthenticated, clear } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -41,6 +42,9 @@ function Header() {
   }, [location.pathname]);
 
   const handleLogout = () => {
+    void api.auth.logout().catch(() => {
+      // Ignore server errors on logout; always clear local state.
+    });
     clear();
     setMenuOpen(false);
     navigate('/login', { replace: true });
@@ -59,58 +63,60 @@ function Header() {
           </div>
         </Link>
 
-        {isAuthenticated ? (
-          <div className="relative" ref={menuRef}>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="text-slate-700 cursor-pointer"
-              aria-expanded={menuOpen}
-              aria-haspopup="menu"
-              aria-label="Mở menu điều hướng"
-              onClick={() => setMenuOpen((open) => !open)}
-            >
-              <Menu className="size-5" strokeWidth={2} />
-            </Button>
-
-            {menuOpen && (
-              <div
-                className="absolute right-0 top-full z-50 mt-2 w-56 rounded-xl border border-slate-200 bg-white py-2 px-1 shadow-lg"
-                role="menu"
+        {isReady ? (
+          isAuthenticated ? (
+            <div className="relative" ref={menuRef}>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="text-slate-700 cursor-pointer"
+                aria-expanded={menuOpen}
+                aria-haspopup="menu"
+                aria-label="Mở menu điều hướng"
+                onClick={() => setMenuOpen((open) => !open)}
               >
-                <NavLink to="/workshops" className={menuNavItem} role="menuitem">
-                  <UserIcon className="size-4 shrink-0" />
-                  Tài khoản
-                </NavLink>
-                <NavLink to="/workshops" className={menuNavItem} role="menuitem">
-                  <CalendarDays className="size-4 shrink-0" />
-                  Lịch workshop
-                </NavLink>
-                <NavLink to="/me/registrations" className={menuNavItem} role="menuitem">
-                  <Ticket className="size-4 shrink-0" />
-                  Đăng ký của tôi
-                </NavLink>
-                <div className="mt-1 border-t border-slate-100 pt-1 px-1">
-                  <button
-                    type="button"
-                    role="menuitem"
-                    className={cn(menuLogoutItem, 'cursor-pointer text-left')}
-                    onClick={handleLogout}
-                  >
-                    <LogOut className="size-4 shrink-0" />
-                    Đăng xuất
-                  </button>
+                <Menu className="size-5" strokeWidth={2} />
+              </Button>
+
+              {menuOpen && (
+                <div
+                  className="absolute right-0 top-full z-50 mt-2 w-56 rounded-xl border border-slate-200 bg-white py-2 px-1 shadow-lg"
+                  role="menu"
+                >
+                  <NavLink to="/workshops" className={menuNavItem} role="menuitem">
+                    <UserIcon className="size-4 shrink-0" />
+                    Tài khoản
+                  </NavLink>
+                  <NavLink to="/workshops" className={menuNavItem} role="menuitem">
+                    <CalendarDays className="size-4 shrink-0" />
+                    Lịch workshop
+                  </NavLink>
+                  <NavLink to="/me/registrations" className={menuNavItem} role="menuitem">
+                    <Ticket className="size-4 shrink-0" />
+                    Đăng ký của tôi
+                  </NavLink>
+                  <div className="mt-1 border-t border-slate-100 pt-1 px-1">
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className={cn(menuLogoutItem, 'cursor-pointer text-left')}
+                      onClick={handleLogout}
+                    >
+                      <LogOut className="size-4 shrink-0" />
+                      Đăng xuất
+                    </button>
+                  </div>
                 </div>
-              </div>
-            )}
-          </div>
-        ) : (
-          <Button size="sm" onClick={() => navigate('/login')} className="cursor-pointer">
-            <LogIn className="size-4" />
-            Đăng nhập
-          </Button>
-        )}
+              )}
+            </div>
+          ) : (
+            <Button size="sm" onClick={() => navigate('/login')} className="cursor-pointer">
+              <LogIn className="size-4" />
+              Đăng nhập
+            </Button>
+          )
+        ) : null}
       </div>
     </header>
   );

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -21,7 +21,7 @@ type FormValues = z.infer<typeof schema>;
 export function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { setSession } = useAuth();
+  const { signIn } = useAuth();
   const [serverError, setServerError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
 
@@ -37,15 +37,8 @@ export function LoginPage() {
   const onSubmit = async (values: FormValues) => {
     setServerError(null);
     try {
-      const res = await api.auth.login(values);
-      setSession(
-        {
-          accessToken: res.accessToken,
-          refreshToken: res.refreshToken,
-          expiresIn: res.expiresIn,
-        },
-        res.user,
-      );
+      const res = await api.auth.loginJwt(values);
+      signIn(res);
       const from = (location.state as { from?: { pathname: string } } | null)?.from?.pathname;
       navigate(from ?? '/', { replace: true });
     } catch (e) {

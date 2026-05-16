@@ -7,36 +7,42 @@ import {
   registrationsApi,
   workshopsApi,
 } from '@unihub/api-client';
-import { tokenStorage } from './auth';
+import { clearAccessToken, getAccessToken, setAccessToken } from './sessionMemory';
 
-const baseURL = (import.meta.env.VITE_API_URL ?? '/api').replace(/\/$/, '');
+export const API_BASE_URL = (import.meta.env.VITE_API_URL ?? '/api').replace(/\/$/, '');
+
+function logoutAndClearClientState(): void {
+  void fetch(`${API_BASE_URL}/auth/logout`, { method: 'POST', credentials: 'include' })
+    .catch(() => {
+      /* network error */
+    })
+    .finally(() => {
+      clearAccessToken();
+    });
+}
 
 export const http = createApiClient({
-  baseURL,
-  tokenStore: tokenStorage,
-  onUnauthorized: () => {
-    tokenStorage.clear();
-    if (window.location.pathname !== '/login') {
-      window.location.assign('/login');
-    }
-  },
+  baseURL: API_BASE_URL,
+  withCredentials: true,
+  onUnauthorized: logoutAndClearClientState,
   refreshAccessToken: async () => {
-    const refreshToken = tokenStorage.getRefreshToken();
-    if (!refreshToken) return null;
-    try {
-      const res = await fetch(`${baseURL}/auth/refresh`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ refreshToken }),
-      });
-      if (!res.ok) return null;
-      const data = (await res.json()) as { accessToken: string; refreshToken: string };
-      tokenStorage.setTokens(data);
-      return data.accessToken;
-    } catch {
-      return null;
-    }
+    const res = await fetch(`${API_BASE_URL}/auth/refresh`, {
+      method: 'POST',
+      credentials: 'include',
+    });
+    if (!res.ok) throw new Error('session_expired');
+    const data = (await res.json()) as { accessToken?: string };
+    if (!data.accessToken) throw new Error('session_expired');
+    setAccessToken(data.accessToken);
   },
+});
+
+http.interceptors.request.use((config) => {
+  const token = getAccessToken();
+  if (token) {
+    config.headers.set('Authorization', `Bearer ${token}`);
+  }
+  return config;
 });
 
 export const api = {

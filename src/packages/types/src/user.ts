@@ -14,17 +14,17 @@ export interface User {
   updatedAt: ISODateString;
 }
 
-export interface AuthTokens {
+export interface SessionLoginResponse {
+  user: User;
+  sessionId?: string;
+}
+
+export interface JwtResponse {
+  user: User;
   accessToken: string;
-  refreshToken: string;
-  expiresIn: number;
 }
 
 export interface LoginRequest {
   email: string;
   password: string;
-}
-
-export interface LoginResponse extends AuthTokens {
-  user: User;
 }

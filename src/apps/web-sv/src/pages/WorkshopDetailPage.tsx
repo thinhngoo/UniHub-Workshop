@@ -14,7 +14,7 @@ export function WorkshopDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const qc = useQueryClient();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, isReady } = useAuth();
 
   const [idempotencyKey] = useState(() => generateIdempotencyKey());
   const [error, setError] = useState<string | null>(null);
@@ -65,6 +65,7 @@ export function WorkshopDetailPage() {
 
   const handleRegister = () => {
     setError(null);
+    if (!isReady) return;
     if (!isAuthenticated) {
       navigate('/login', { state: { from: { pathname: `/workshops/${id}` } } });
       return;
