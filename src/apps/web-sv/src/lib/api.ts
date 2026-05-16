@@ -11,20 +11,10 @@ import { clearAccessToken, getAccessToken, setAccessToken } from './sessionMemor
 
 export const API_BASE_URL = (import.meta.env.VITE_API_URL ?? '/api').replace(/\/$/, '');
 
-function logoutAndClearClientState(): void {
-  void fetch(`${API_BASE_URL}/auth/logout`, { method: 'POST', credentials: 'include' })
-    .catch(() => {
-      /* network error */
-    })
-    .finally(() => {
-      clearAccessToken();
-    });
-}
-
 export const http = createApiClient({
   baseURL: API_BASE_URL,
   withCredentials: true,
-  onUnauthorized: logoutAndClearClientState,
+  onUnauthorized: clearAccessToken,
   refreshAccessToken: async () => {
     const res = await fetch(`${API_BASE_URL}/auth/refresh`, {
       method: 'POST',

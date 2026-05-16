@@ -10,7 +10,7 @@ Stack:
 - **expo-sqlite** cho outbox check-in offline (`client_event_id` UUID + `scanned_at`). WatermelonDB cũng phù hợp nhưng đòi hỏi cấu hình native nhiều hơn — `expo-sqlite` đáp ứng đúng yêu cầu ADR-1/§3.1 mà vẫn chạy được qua Expo Go.
 - **expo-crypto** sinh UUIDv4 mạnh.
 - **@tanstack/react-query** cho data fetching + caching.
-- **@react-native-async-storage/async-storage** cho session token.
+- **expo-secure-store** lưu `sessionId` của staff (session-based auth, ADR-2).
 
 ## Luồng nghiệp vụ (tham chiếu `blueprint/design.md` §3.1)
 
@@ -41,8 +41,9 @@ apps/mobile-checkin/
 │       └── queue.tsx            # list + sync button
 └── src/
     └── lib/
-        ├── api.ts               # createApiClient(...) wired to AsyncStorage
-        ├── auth.tsx             # AuthProvider/useAuth + tokenStorage
+        ├── api.ts               # createApiClient(...) + axios interceptor injects sessionId
+        ├── auth.tsx             # AuthProvider/useAuth backed by SecureStore sessionId
+        ├── sessionStore.ts      # expo-secure-store helpers cho sessionId
         ├── outbox.ts            # expo-sqlite CRUD
         ├── qr.ts                # local QR verify (HMAC TBD)
         ├── uuid.ts              # expo-crypto randomUUID
@@ -79,7 +80,7 @@ App tự suy ra `http://<expo-debugger-host>:3000` (tốt cho trường hợp ch
 
 | Email                    | Mật khẩu    | Roles           | Mục đích                      |
 | ------------------------ | ----------- | --------------- | ----------------------------- |
-| `staff@unihub.edu.vn`    | `staff1234` | `checkin_staff` | Tài khoản chính của app này   |
+| `staff@unihub.edu.vn`    | `staff1234` | `staff`         | Tài khoản chính của app này   |
 | `admin@unihub.edu.vn`    | `admin123`  | `admin`         | Cũng được phép gọi `/checkin` |
 | `student@…` / `organizer@…` | —        | —               | 403 khi gọi `/checkin/batch`  |
 

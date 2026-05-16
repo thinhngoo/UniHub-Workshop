@@ -1,6 +1,7 @@
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { CalendarDays, LayoutDashboard, ListChecks, LogOut, ShieldAlert } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
+import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { cn } from '@unihub/format/cn';
 
@@ -14,13 +15,24 @@ const mobileNavItem = ({ isActive }: { isActive: boolean }) =>
   cn(navItem({ isActive }), 'min-w-0 flex-1 justify-center gap-1.5 px-2 py-2');
 
 export function AdminLayout() {
-  const { user, hasAdminAccess, clear } = useAuth();
+  const { user, hasAdminAccess, clear, isReady } = useAuth();
   const navigate = useNavigate();
 
   const handleLogout = () => {
+    void api.auth.logout().catch(() => {
+      // Ignore server errors on logout; always clear local state.
+    });
     clear();
     navigate('/login', { replace: true });
   };
+
+  if (!isReady) {
+    return (
+      <div className="min-h-screen flex items-center justify-center text-sm text-slate-500">
+        Đang tải phiên đăng nhập…
+      </div>
+    );
+  }
 
   if (!hasAdminAccess) {
     return (

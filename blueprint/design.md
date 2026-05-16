@@ -37,6 +37,29 @@ flowchart TB
 ```
 
 
+
+## Bảo mật
+
+**Authentication**:
+
+- Admin và staff sử dụng session-based authentication.
+- Sinh viên sử dụng JWT authentication.
+
+**QR Token**:
+
+- Ký bằng secret của server.
+- Payload chỉ chứa registration_id và expires_at → giảm dữ liệu nhạy cảm.
+
+**RBAC**: Dùng cho ba nhóm người dùng trong (sinh viên / ban tổ chức / nhân sự) trong yêu cầu — **ba vai trò rõ rệt, ổn định**, và không phụ thuộc vào những thuộc tính runtime.
+
+| Role        | Permission                                                                                                                      |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `student`   | `workshop:read`, `registration:create(self)`, `registration:read(self)`, `registration:cancel(self)`, `notification:read(self)` |
+| `organizer` | `workshop:*`, `registration:read(any)`                                                                                          |
+| `staff`     | `checkin:create`, `checkin:batch_sync`, `registration:read(byqr)`                                                               |
+| `admin`     | All                                                                                                                             |
+
+
 ## Tech-stack
 
 **Web App (Sinh viên + Admin) — React + Vite + TypeScript**:
@@ -71,3 +94,42 @@ flowchart TB
 	- ORM dùng **Prisma**
 
 
+## Các quyết định kỹ thuật
+
+### Modular Monolith
+
+- **Lựa chọn**: Một backend process duy nhất xây dựng bằng NestJS, được chia thành các module ánh xạ 1-1 với từng module nghiệp vụ.
+- **Tại sao**:
+    - Phù hợp với phạm vi yêu cầu vừa phải và quy mô team nhỏ.
+    - Nhiều luồng nghiệp vụ (đặc biệt là đăng ký và thanh toán) cần transaction ACID xuyên nhiều entity, monolith giúp xử lý đơn giản và nhất quán hơn so với distributed transaction.
+    - Cung cấp sẵn module system và Dependency Injection, giúp chuẩn hóa cấu trúc dự án mà không cần tự thiết kế lại layering từ đầu.
+- **Đánh đổi**:
+    - Khả năng scale độc lập giữa các module kém linh hoạt hơn so với microservices.
+    - Ngoại trừ các worker hoặc module xử lý tác vụ nặng được tách riêng, một lỗi nghiêm trọng trong hệ thống chính có thể ảnh hưởng toàn bộ server process.
+- **Cân nhắc**: Từng module có thể được tách dần khi:
+    - Khi hệ thống cần phục vụ tải lớn hơn nhiều so với hiện tại.
+    - Module có quy mô và nhịp phát triển khác biệt rõ rệt.
+
+### Authentication
+
+- **Lựa chọn:**
+    - JWT stateless cho web sinh viên.
+    - Session-based authentication cho web admin và mobile staff.
+- **Tại sao:**
+    - Web sinh viên ưu tiên scale ngang và giảm phụ thuộc vào shared session storage.
+    - Admin và staff yêu cầu revoke session để tăng cường bảo mật và kiểm soát truy cập.
+- **Đánh đổi:**
+    - JWT stateless khó revoke access token trước thời hạn hết hạn.
+    - Giảm thiểu bằng cách sử dụng access token có TTL ngắn (ví dụ 15 phút) kết hợp refresh token có thể revoke phía server.
+- **Thuật toán ký:** Sử dụng HS256 cho JWT trong kiến trúc monolith nhằm giữ triển khai đơn giản và dễ quản lý secret nội bộ.
+
+### Relational Database
+
+- **Lựa chọn**: SQL với PostgreSQL.
+- **Tại sao**:
+    - Nghiệp vụ lõi yêu cầu tính nhất quán cao, transaction ACID, cùng nhiều constraint và quan hệ phức tạp — phù hợp với thế mạnh của RDBMS, đặc biệt là PostgreSQL.
+    - Số lượng entity và mức độ phức tạp dữ liệu vẫn nằm trong phạm vi phù hợp với relational model.
+    - Không có yêu cầu về schema động hoặc dữ liệu phi cấu trúc ở quy mô lớn.
+- **Đánh đổi**:
+    - Khi tải tăng cao, cần chú ý đến contention do lock, chiến lược indexing và tối ưu query để tránh ảnh hưởng hiệu năng.
+    - Việc scale write theo chiều ngang khó hơn.

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -21,9 +21,15 @@ type FormValues = z.infer<typeof schema>;
 export function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { setSession } = useAuth();
+  const { isReady, isAuthenticated, hasAdminAccess, signIn } = useAuth();
   const [serverError, setServerError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
+
+  useEffect(() => {
+    if (!isReady || !isAuthenticated || !hasAdminAccess) return;
+    const from = (location.state as { from?: { pathname: string } } | null)?.from?.pathname;
+    navigate(from ?? '/', { replace: true });
+  }, [isReady, isAuthenticated, hasAdminAccess, location.state, navigate]);
 
   const {
     register,
@@ -37,21 +43,14 @@ export function LoginPage() {
   const onSubmit = async (values: FormValues) => {
     setServerError(null);
     try {
-      const res = await api.auth.login(values);
+      const res = await api.auth.loginSession(values);
       const allowed =
         res.user.role === 'admin' || res.user.role === 'organizer';
       if (!allowed) {
         setServerError('Tài khoản này không có quyền truy cập.');
         return;
       }
-      setSession(
-        {
-          accessToken: res.accessToken,
-          refreshToken: res.refreshToken,
-          expiresIn: res.expiresIn,
-        },
-        res.user,
-      );
+      signIn(res);
       const from = (location.state as { from?: { pathname: string } } | null)?.from?.pathname;
       navigate(from ?? '/', { replace: true });
     } catch (e) {
