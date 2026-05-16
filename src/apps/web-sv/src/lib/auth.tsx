@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
-import type { JwtResponse, User } from '@unihub/types';
+import type { JwtLoginResponse, User } from '@unihub/types';
 import { api } from './api';
 import { clearAccessToken, setAccessToken } from './sessionMemory';
 
@@ -8,7 +8,7 @@ export interface AuthState {
   user: User | null;
   isAuthenticated: boolean;
   isReady: boolean;
-  signIn: (res: JwtResponse) => void;
+  signIn: (res: JwtLoginResponse) => void;
   clear: () => void;
 }
 
@@ -44,7 +44,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  const signIn = useCallback((res: JwtResponse) => {
+  const signIn = useCallback((res: JwtLoginResponse) => {
     setAccessToken(res.accessToken);
     setUserState(res.user);
     setIsAuthenticated(true);

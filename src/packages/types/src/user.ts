@@ -1,6 +1,7 @@
 import type { ISODateString, UUID } from './common.js';
 
 export type RoleCode = 'student' | 'organizer' | 'staff' | 'admin';
+export type LoginClient = 'student' | 'organizer' | 'staff';
 export type UserStatus = 'active' | 'disabled';
 
 export interface User {
@@ -19,7 +20,7 @@ export interface SessionLoginResponse {
   sessionId?: string;
 }
 
-export interface JwtResponse {
+export interface JwtLoginResponse {
   user: User;
   accessToken: string;
 }
@@ -27,4 +28,5 @@ export interface JwtResponse {
 export interface LoginRequest {
   email: string;
   password: string;
+  client: LoginClient;
 }

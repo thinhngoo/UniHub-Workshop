@@ -4,7 +4,8 @@ import type { Request } from 'express';
 export const ExtractToken = createParamDecorator(
   (_data: unknown, ctx: ExecutionContext): string | undefined => {
     const req = ctx.switchToHttp().getRequest<Request>();
-    const raw = req.headers['authorization'];
-    return typeof raw === 'string' ? raw : undefined;
+    const h = req.headers['authorization'];
+    if (typeof h === 'string' && h.trim().length > 0) return h.trim();
+    return undefined;
   },
 );

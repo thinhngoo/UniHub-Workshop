@@ -37,7 +37,7 @@ export function LoginPage() {
   const onSubmit = async (values: FormValues) => {
     setServerError(null);
     try {
-      const res = await api.auth.loginJwt(values);
+      const res = await api.auth.loginJwt({ ...values, client: 'student' });
       signIn(res);
       const from = (location.state as { from?: { pathname: string } } | null)?.from?.pathname;
       navigate(from ?? '/', { replace: true });

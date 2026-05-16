@@ -43,13 +43,10 @@ export function LoginPage() {
   const onSubmit = async (values: FormValues) => {
     setServerError(null);
     try {
-      const res = await api.auth.loginSession(values);
-      const allowed =
-        res.user.role === 'admin' || res.user.role === 'organizer';
-      if (!allowed) {
-        setServerError('Tài khoản này không có quyền truy cập.');
-        return;
-      }
+      const res = await api.auth.loginSession({
+        ...values,
+        client: 'organizer',
+      });
       signIn(res);
       const from = (location.state as { from?: { pathname: string } } | null)?.from?.pathname;
       navigate(from ?? '/', { replace: true });
