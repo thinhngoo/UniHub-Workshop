@@ -11,7 +11,7 @@ import {
   JWT_REFRESH_EXPIRES_IN,
   SESSION_ID_RANDOM_BYTES,
 } from '../../constant';
-import { UsersRepository } from '../database/users.repository';
+import { UsersRepository } from '../database/repository/users.repository';
 import { SessionStore } from './session.store';
 
 type IssuedJwt = {

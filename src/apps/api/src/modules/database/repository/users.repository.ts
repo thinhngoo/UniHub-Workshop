@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type { User as DomainUser } from '@unihub/types';
 import type { User as DbUser } from '@prisma/client';
-import { PrismaService } from './prisma.service';
+import { PrismaService } from '../prisma.service';
 
 export interface UserWithPassword {
   user: DomainUser;

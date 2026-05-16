@@ -4,7 +4,8 @@ import { AppDataStore } from './app-data.store';
 import { encodeDatabaseUrl } from './encode-database-url';
 import { InMemoryAppDataStore } from './in-memory-app-data.store';
 import { PrismaService } from './prisma.service';
-import { UsersRepository } from './users.repository';
+import { UsersRepository } from './repository/users.repository';
+import { WorkshopsRepository } from './repository/workshops.repository';
 
 @Module({
   imports: [ConfigModule],
@@ -24,11 +25,12 @@ import { UsersRepository } from './users.repository';
       },
     },
     UsersRepository,
+    WorkshopsRepository,
     {
       provide: AppDataStore,
       useClass: InMemoryAppDataStore,
     },
   ],
-  exports: [AppDataStore, PrismaService, UsersRepository],
+  exports: [AppDataStore, PrismaService, UsersRepository, WorkshopsRepository],
 })
 export class DatabaseModule {}
