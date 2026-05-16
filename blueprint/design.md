@@ -6,6 +6,10 @@
 
 **Modular Monolith cho Backend API** kết hợp với 3 hệ **client tách biệt** (Web SV, Web Admin, Mobile Staff) và một số **worker chạy nền** cho các tác vụ bất đồng bộ. Microservices ở backend tạo overhead vận hành. Monolith cho phép các module centralized và refactor dễ dàng; sẽ cân nhắc tách khi mục tiêu nghiệp vụ đủ lớn và phức tạp.
 
+| Module            | Chức năng chính                                                                   |
+| ----------------- | --------------------------------------------------------------------------------- |
+| `auth`            | Xác thực, kiểm tra role (RBAC)                                                    |
+| `workshop`        | CRUD workshop, quản lý số chỗ                                                     |
 
 ### C4 Diagram
 

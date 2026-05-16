@@ -7,6 +7,7 @@ import { JwtService } from '@nestjs/jwt';
 import { randomBytes } from 'node:crypto';
 import type { LoginClient, RoleCode, User } from '@unihub/types';
 import { UsersRepository } from '../database/users.repository';
+import { SessionStore } from './session.store';
 
 type IssuedJwt = {
   user: User;
@@ -33,9 +34,8 @@ export class AuthService {
   constructor(
     private readonly users: UsersRepository,
     private readonly jwt: JwtService,
+    private readonly sessionStore: SessionStore,
   ) {}
-
-  private readonly sessions = new Map<string, string>();
 
   async loginJwt(
     email: string,
@@ -70,7 +70,7 @@ export class AuthService {
   }
 
   async session(sessionId: string): Promise<User | null> {
-    const userId = this.sessions.get(sessionId);
+    const userId = await this.sessionStore.getUserId(sessionId);
     if (!userId) return null;
     return this.users.findUserById(userId);
   }
@@ -83,22 +83,45 @@ export class AuthService {
         message: 'Phiên đăng nhập không hợp lệ.',
       });
     }
-    const user = await this.users.findUserById(token);
-    if (!user) {
-      throw new UnauthorizedException({
-        code: 'unauthenticated',
-        message: 'Phiên đăng nhập không hợp lệ.',
-      });
+
+    if (token.startsWith('session.')) {
+      const user = await this.session(token);
+      if (!user) {
+        throw new UnauthorizedException({
+          code: 'unauthenticated',
+          message: 'Phiên đăng nhập không hợp lệ.',
+        });
+      }
+      return user;
     }
-    return user;
+
+    try {
+      const payload = this.jwt.verify<AccessPayload>(token);
+      const user = await this.users.findUserById(payload.sub);
+      if (!user) {
+        throw new UnauthorizedException({
+          code: 'unauthenticated',
+          message: 'Phiên đăng nhập không hợp lệ.',
+        });
+      }
+      return user;
+    } catch (err: unknown) {
+      if (err instanceof UnauthorizedException) throw err;
+
+      const user = await this.users.findUserById(token);
+      if (!user) {
+        throw new UnauthorizedException({
+          code: 'unauthenticated',
+          message: 'Phiên đăng nhập không hợp lệ.',
+        });
+      }
+      return user;
+    }
   }
 
-  logout(authorizationHeader: string | undefined) {
-    const token = this.parseBearer(authorizationHeader);
-
-    if (token?.startsWith('session.')) {
-      this.sessions.delete(token);
-    }
+  async logout(sessionId: string | null): Promise<void> {
+    if (!sessionId) return;
+    await this.sessionStore.delete(sessionId);
   }
 
   private async verifyLogin(email: string, password: string): Promise<User> {
@@ -155,14 +178,20 @@ export class AuthService {
     };
   }
 
-  private issueSession(user: User): IssuedSession {
-    const sessionId = `session.${randomBytes(16).toString('hex')}`;
-    this.sessions.set(sessionId, user.id);
+  private async issueSession(user: User): Promise<IssuedSession> {
+    const sessionId = randomBytes(16).toString('hex');
+    await this.sessionStore.set(sessionId, user.id);
 
     return {
       user,
       sessionId,
     };
+  }
+
+  private normalizeSessionCredential(raw: string): string {
+    const trimmed = raw.trim();
+    const bearer = /^Bearer\s+(.+)$/i.exec(trimmed);
+    return (bearer?.[1] ?? trimmed).trim();
   }
 
   private parseBearer(header: string | undefined): string | null {

@@ -12,8 +12,9 @@ import {
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import type { JwtLoginResponse, SessionLoginResponse } from '@unihub/types';
-import { authorizationFromRequest } from './authorization-from-request';
+import { SESSION_COOKIE } from './authorization-from-request';
 import { AuthService } from './auth.service';
+import { SESSION_TTL_SEC } from './session.store';
 
 interface LoginBody {
   email?: unknown;
@@ -27,7 +28,6 @@ interface RefreshBody {
 
 const REFRESH_COOKIE = 'unihub_refresh';
 const REFRESH_MS = 30 * 24 * 60 * 60 * 1_000;
-const SESSION_COOKIE = 'unihub_session';
 
 @Controller('auth')
 export class AuthController {
@@ -52,10 +52,19 @@ export class AuthController {
 
   @Post('login/session')
   @HttpCode(HttpStatus.OK)
-  async loginSession(@Body() body: LoginBody): Promise<SessionLoginResponse> {
+  async loginSession(
+    @Body() body: LoginBody,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<SessionLoginResponse> {
     const { email, password } = this.requireCredentials(body);
     const client = this.requireLoginClient(body);
-    return await this.auth.loginSession(email, password, client);
+    const { user, sessionId } = await this.auth.loginSession(
+      email,
+      password,
+      client,
+    );
+    this.setSessionCookie(res, sessionId);
+    return { user, sessionId };
   }
 
   @Get('me/jwt')
@@ -67,8 +76,8 @@ export class AuthController {
     const refreshToken = this.readCookie(req, REFRESH_COOKIE);
     if (!refreshToken) {
       throw new UnauthorizedException({
-        code: 'unauthenticated',
-        message: 'Phiên đăng nhập đã hết hạn.',
+        code: 'invalid_request',
+        message: 'Thiếu refresh token.',
       });
     }
 
@@ -91,8 +100,8 @@ export class AuthController {
       (typeof req.headers.authorization === 'string'
         ? req.headers.authorization
         : '');
-    const user = await this.auth.session(sessionId);
 
+    const user = await this.auth.session(sessionId);
     if (!user) {
       throw new UnauthorizedException({
         code: 'unauthenticated',
@@ -138,10 +147,12 @@ export class AuthController {
 
   @Post('logout')
   @HttpCode(HttpStatus.NO_CONTENT)
-  logout(@Req() req: Request, @Res({ passthrough: true }) res: Response): void {
-    const authorization = authorizationFromRequest(req);
-
-    this.auth.logout(authorization);
+  async logout(
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<void> {
+    const sessionId = this.readCookie(req, SESSION_COOKIE);
+    await this.auth.logout(sessionId);
     this.clearAuthCookies(res);
   }
 
@@ -196,8 +207,16 @@ export class AuthController {
     });
   }
 
+  private setSessionCookie(res: Response, sessionId: string): void {
+    res.cookie(SESSION_COOKIE, sessionId, {
+      ...this.cookieBase(),
+      maxAge: SESSION_TTL_SEC * 1_000,
+    });
+  }
+
   private clearAuthCookies(res: Response): void {
     const base = this.cookieBase();
     res.clearCookie(REFRESH_COOKIE, base);
+    res.clearCookie(SESSION_COOKIE, base);
   }
 }
