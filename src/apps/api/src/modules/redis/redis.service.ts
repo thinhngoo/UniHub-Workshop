@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Redis from 'ioredis';
+import { REDIS_DEFAULT_URL } from '../../constant';
 
 @Injectable()
 export class RedisService implements OnModuleInit, OnModuleDestroy {
@@ -14,7 +15,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
 
   constructor(private readonly config: ConfigService) {
     const url =
-      this.config.get<string>('REDIS_URL')?.trim() ?? 'redis://127.0.0.1:6379';
+      this.config.get<string>('REDIS_URL')?.trim() ?? REDIS_DEFAULT_URL;
 
     this.client = new Redis(url, {
       maxRetriesPerRequest: null,

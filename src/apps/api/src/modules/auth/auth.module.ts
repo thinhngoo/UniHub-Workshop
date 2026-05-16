@@ -13,11 +13,9 @@ import { SessionStore } from './session.store';
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
-        secret:
-          config.get<string>('JWT_SECRET') ?? 'dev-secret-change-in-production',
+        secret: config.get<string>('JWT_SECRET'),
         signOptions: {
           algorithm: 'HS256',
-          expiresIn: '15m',
         },
       }),
     }),

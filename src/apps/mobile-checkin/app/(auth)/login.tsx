@@ -18,10 +18,10 @@ import { colors } from '@/lib/colors';
 
 export default function LoginScreen() {
   const router = useRouter();
-  const { setSession } = useAuth();
+  const { signIn } = useAuth();
 
-  const [email, setEmail] = useState('staff@unihub.edu.vn');
-  const [password, setPassword] = useState('staff1234');
+  const [email, setEmail] = useState('staff@gmail.com');
+  const [password, setPassword] = useState('1234567');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -36,23 +36,12 @@ export default function LoginScreen() {
 
     setSubmitting(true);
     try {
-      const res = await api.auth.login({
-        email: email.trim(),
+      const res = await api.auth.loginSession({
+        email,
         password,
+        client: 'staff',
       });
-      const allowed = res.user.role === 'staff' || res.user.role === 'admin';
-      if (!allowed) {
-        setError('Tài khoản này không có quyền truy cập.');
-        return;
-      }
-      await setSession(
-        {
-          accessToken: res.accessToken,
-          refreshToken: res.refreshToken,
-          expiresIn: res.expiresIn,
-        },
-        res.user,
-      );
+      await signIn(res);
       router.replace('/(tabs)/scan');
     } catch (e) {
       if (e instanceof ApiError) {
@@ -69,9 +58,6 @@ export default function LoginScreen() {
       setSubmitting(false);
     }
   };
-
-  const showHint = () =>
-    Alert.alert('Tài khoản', 'staff@unihub.edu.vn / staff1234\nadmin@unihub.edu.vn / admin123');
 
   return (
     <KeyboardAvoidingView
@@ -133,10 +119,6 @@ export default function LoginScreen() {
             ) : (
               <Text style={styles.buttonText}>Đăng nhập</Text>
             )}
-          </TouchableOpacity>
-
-          <TouchableOpacity onPress={showHint} style={styles.hintButton}>
-            <Text style={styles.hintText}>Xem tài khoản</Text>
           </TouchableOpacity>
         </View>
       </View>

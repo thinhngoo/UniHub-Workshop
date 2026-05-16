@@ -1,14 +1,13 @@
 import { Injectable } from '@nestjs/common';
+import { SESSION_REDIS_KEY_PREFIX, SESSION_TTL_SEC } from '../../constant';
 import { RedisService } from '../redis/redis.service';
-
-export const SESSION_TTL_SEC = 30 * 24 * 60 * 60;
 
 @Injectable()
 export class SessionStore {
   constructor(private readonly redis: RedisService) {}
 
   private key(sessionId: string): string {
-    return `session:${sessionId}`;
+    return `${SESSION_REDIS_KEY_PREFIX}${sessionId}`;
   }
 
   async set(sessionId: string, userId: string): Promise<void> {

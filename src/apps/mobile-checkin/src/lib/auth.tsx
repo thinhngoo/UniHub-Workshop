@@ -1,4 +1,3 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   createContext,
   useCallback,
@@ -8,17 +7,15 @@ import {
   useState,
 } from 'react';
 import type { ReactNode } from 'react';
-import type { AuthTokens, User } from '@unihub/types';
-
-const ACCESS_KEY = 'unihub.checkin.accessToken';
-const REFRESH_KEY = 'unihub.checkin.refreshToken';
-const USER_KEY = 'unihub.checkin.user';
+import type { SessionLoginResponse, User } from '@unihub/types';
+import { api } from './api';
+import { clearSessionId, loadSessionId, persistSessionId } from './sessionStore';
 
 export interface AuthState {
   user: User | null;
   isReady: boolean;
   isAuthenticated: boolean;
-  setSession: (tokens: AuthTokens, user: User) => Promise<void>;
+  signIn: (res: SessionLoginResponse) => Promise<void>;
   clear: () => Promise<void>;
 }
 
@@ -29,32 +26,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
+    let cancelled = false;
+
     (async () => {
       try {
-        const raw = await AsyncStorage.getItem(USER_KEY);
-        if (raw) setUser(JSON.parse(raw) as User);
+        const sessionId = await loadSessionId();
+        if (!sessionId) return;
+        const data = await api.auth.meSession();
+        if (cancelled) return;
+        setUser(data.user);
       } catch {
-        // ignore corrupt session, user will log in again
+        await clearSessionId();
       } finally {
-        setIsReady(true);
+        if (!cancelled) setIsReady(true);
       }
     })();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  const setSession = useCallback(
-    async (tokens: AuthTokens, nextUser: User) => {
-      await AsyncStorage.multiSet([
-        [ACCESS_KEY, tokens.accessToken],
-        [REFRESH_KEY, tokens.refreshToken],
-        [USER_KEY, JSON.stringify(nextUser)],
-      ]);
-      setUser(nextUser);
-    },
-    [],
-  );
+  const signIn = useCallback(async (res: SessionLoginResponse) => {
+    if (!res.sessionId) {
+      throw new Error('Phản hồi không hợp lệ.');
+    }
+    await persistSessionId(res.sessionId);
+    setUser(res.user);
+  }, []);
 
   const clear = useCallback(async () => {
-    await AsyncStorage.multiRemove([ACCESS_KEY, REFRESH_KEY, USER_KEY]);
+    void api.auth.logout().catch(() => {
+      // Ignore server errors on logout; always clear local state.
+    });
+    await clearSessionId();
     setUser(null);
   }, []);
 
@@ -63,10 +68,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user,
       isReady,
       isAuthenticated: !!user,
-      setSession,
+      signIn,
       clear,
     }),
-    [user, isReady, setSession, clear],
+    [user, isReady, signIn, clear],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
@@ -77,17 +82,3 @@ export function useAuth(): AuthState {
   if (!ctx) throw new Error('useAuth must be used within AuthProvider');
   return ctx;
 }
-
-export const tokenStorage = {
-  getAccessToken: () => AsyncStorage.getItem(ACCESS_KEY),
-  getRefreshToken: () => AsyncStorage.getItem(REFRESH_KEY),
-  setTokens: async (tokens: { accessToken: string; refreshToken?: string }) => {
-    await AsyncStorage.setItem(ACCESS_KEY, tokens.accessToken);
-    if (tokens.refreshToken) {
-      await AsyncStorage.setItem(REFRESH_KEY, tokens.refreshToken);
-    }
-  },
-  clear: async () => {
-    await AsyncStorage.multiRemove([ACCESS_KEY, REFRESH_KEY, USER_KEY]);
-  },
-};

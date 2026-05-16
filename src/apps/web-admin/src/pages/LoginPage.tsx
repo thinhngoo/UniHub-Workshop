@@ -21,15 +21,9 @@ type FormValues = z.infer<typeof schema>;
 export function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { isReady, isAuthenticated, hasAdminAccess, signIn } = useAuth();
+  const { signIn } = useAuth();
   const [serverError, setServerError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
-
-  useEffect(() => {
-    if (!isReady || !isAuthenticated || !hasAdminAccess) return;
-    const from = (location.state as { from?: { pathname: string } } | null)?.from?.pathname;
-    navigate(from ?? '/', { replace: true });
-  }, [isReady, isAuthenticated, hasAdminAccess, location.state, navigate]);
 
   const {
     register,
@@ -37,7 +31,7 @@ export function LoginPage() {
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { email: '', password: '' },
+    defaultValues: { email: 'organizer@gmail.com', password: '1234567' },
   });
 
   const onSubmit = async (values: FormValues) => {

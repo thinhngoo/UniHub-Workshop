@@ -1,6 +1,5 @@
 import type { Request } from 'express';
-
-export const SESSION_COOKIE = 'unihub_session';
+import { SESSION_COOKIE } from '../../constant';
 
 export function authorizationFromRequest(req: Request): string | undefined {
   const header = req.headers['authorization'];

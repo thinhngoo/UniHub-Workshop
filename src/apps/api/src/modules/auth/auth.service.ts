@@ -6,6 +6,11 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import { randomBytes } from 'node:crypto';
 import type { LoginClient, RoleCode, User } from '@unihub/types';
+import {
+  JWT_ACCESS_EXPIRES_IN,
+  JWT_REFRESH_EXPIRES_IN,
+  SESSION_ID_RANDOM_BYTES,
+} from '../../constant';
 import { UsersRepository } from '../database/users.repository';
 import { SessionStore } from './session.store';
 
@@ -37,23 +42,23 @@ export class AuthService {
     private readonly sessionStore: SessionStore,
   ) {}
 
-  async loginJwt(
+  async jwtLogin(
     email: string,
     password: string,
     client: LoginClient,
   ): Promise<IssuedJwt> {
     const user = await this.verifyLogin(email, password);
-    this.assertLoginClientAllowed(client, user.role);
+    this.assertClientAllowed(client, user.role);
     return this.issueTokens(user);
   }
 
-  async loginSession(
+  async sessionLogin(
     email: string,
     password: string,
     client: LoginClient,
   ): Promise<IssuedSession> {
     const user = await this.verifyLogin(email, password);
-    this.assertLoginClientAllowed(client, user.role);
+    this.assertClientAllowed(client, user.role);
     return this.issueSession(user);
   }
 
@@ -75,24 +80,12 @@ export class AuthService {
     return this.users.findUserById(userId);
   }
 
-  async me(authorizationHeader: string | undefined): Promise<User> {
-    const token = this.parseBearer(authorizationHeader);
+  async me(token: string | undefined): Promise<User> {
     if (!token) {
       throw new UnauthorizedException({
         code: 'unauthenticated',
         message: 'Phiên đăng nhập không hợp lệ.',
       });
-    }
-
-    if (token.startsWith('session.')) {
-      const user = await this.session(token);
-      if (!user) {
-        throw new UnauthorizedException({
-          code: 'unauthenticated',
-          message: 'Phiên đăng nhập không hợp lệ.',
-        });
-      }
-      return user;
     }
 
     try {
@@ -145,7 +138,7 @@ export class AuthService {
     return account.user;
   }
 
-  private assertLoginClientAllowed(client: LoginClient, role: RoleCode) {
+  private assertClientAllowed(client: LoginClient, role: RoleCode) {
     if (role === 'admin') return;
     if (client === 'student') return;
 
@@ -166,11 +159,13 @@ export class AuthService {
       {
         sub: user.id,
       },
-      { expiresIn: '30d' },
+      { expiresIn: JWT_REFRESH_EXPIRES_IN },
     );
 
     const jwtPayload: AccessPayload = { sub: user.id, role: user.role };
-    const accessToken = this.jwt.sign(jwtPayload);
+    const accessToken = this.jwt.sign(jwtPayload, {
+      expiresIn: JWT_ACCESS_EXPIRES_IN,
+    });
     return {
       user,
       accessToken,
@@ -179,24 +174,12 @@ export class AuthService {
   }
 
   private async issueSession(user: User): Promise<IssuedSession> {
-    const sessionId = randomBytes(16).toString('hex');
+    const sessionId = randomBytes(SESSION_ID_RANDOM_BYTES).toString('hex');
     await this.sessionStore.set(sessionId, user.id);
 
     return {
       user,
       sessionId,
     };
-  }
-
-  private normalizeSessionCredential(raw: string): string {
-    const trimmed = raw.trim();
-    const bearer = /^Bearer\s+(.+)$/i.exec(trimmed);
-    return (bearer?.[1] ?? trimmed).trim();
-  }
-
-  private parseBearer(header: string | undefined): string | null {
-    if (!header) return null;
-    const match = /^Bearer\s+(.+)$/i.exec(header.trim());
-    return match?.[1] ?? null;
   }
 }

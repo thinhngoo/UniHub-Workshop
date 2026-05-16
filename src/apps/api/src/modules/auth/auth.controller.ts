@@ -9,42 +9,51 @@ import {
   Req,
   Res,
   UnauthorizedException,
+  UsePipes,
+  ValidationPipe,
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import type { JwtLoginResponse, SessionLoginResponse } from '@unihub/types';
-import { SESSION_COOKIE } from './authorization-from-request';
+import {
+  REFRESH_COOKIE,
+  REFRESH_COOKIE_MAX_AGE_SEC,
+  SESSION_COOKIE,
+  SESSION_TTL_SEC,
+} from '../../constant';
 import { AuthService } from './auth.service';
-import { SESSION_TTL_SEC } from './session.store';
+import { AuthLoginDto } from './dto/auth-login.dto';
+import { AuthRefreshDto } from './dto/auth-refresh.dto';
 
-interface LoginBody {
-  email?: unknown;
-  password?: unknown;
-  client?: unknown;
-}
-
-interface RefreshBody {
-  refreshToken?: unknown;
-}
-
-const REFRESH_COOKIE = 'unihub_refresh';
-const REFRESH_MS = 30 * 24 * 60 * 60 * 1_000;
+const authBodyValidationPipe = new ValidationPipe({
+  whitelist: true,
+  transform: true,
+  forbidNonWhitelisted: true,
+  exceptionFactory: (errors: unknown) => {
+    const messages = (
+      errors as { constraints?: Record<string, string> }[]
+    ).flatMap((e) => (e.constraints ? Object.values(e.constraints) : []));
+    return new BadRequestException({
+      code: 'invalid_request',
+      message: messages[0] ?? 'Yêu cầu không hợp lệ.',
+    });
+  },
+});
 
 @Controller('auth')
+@UsePipes(authBodyValidationPipe)
 export class AuthController {
   constructor(private readonly auth: AuthService) {}
 
   @Post('login/jwt')
   @HttpCode(HttpStatus.OK)
   async loginJwt(
-    @Body() body: LoginBody,
+    @Body() body: AuthLoginDto,
     @Res({ passthrough: true }) res: Response,
   ): Promise<JwtLoginResponse> {
-    const { email, password } = this.requireCredentials(body);
-    const client = this.requireLoginClient(body);
-    const { user, accessToken, refreshToken } = await this.auth.loginJwt(
-      email,
-      password,
-      client,
+    const { user, accessToken, refreshToken } = await this.auth.jwtLogin(
+      body.email,
+      body.password,
+      body.client,
     );
     this.setRefreshCookie(res, refreshToken);
     return { user, accessToken };
@@ -53,15 +62,13 @@ export class AuthController {
   @Post('login/session')
   @HttpCode(HttpStatus.OK)
   async loginSession(
-    @Body() body: LoginBody,
+    @Body() body: AuthLoginDto,
     @Res({ passthrough: true }) res: Response,
   ): Promise<SessionLoginResponse> {
-    const { email, password } = this.requireCredentials(body);
-    const client = this.requireLoginClient(body);
-    const { user, sessionId } = await this.auth.loginSession(
-      email,
-      password,
-      client,
+    const { user, sessionId } = await this.auth.sessionLogin(
+      body.email,
+      body.password,
+      body.client,
     );
     this.setSessionCookie(res, sessionId);
     return { user, sessionId };
@@ -74,8 +81,9 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response,
   ): Promise<JwtLoginResponse> {
     const refreshToken = this.readCookie(req, REFRESH_COOKIE);
+
     if (!refreshToken) {
-      throw new UnauthorizedException({
+      throw new BadRequestException({
         code: 'invalid_request',
         message: 'Thiếu refresh token.',
       });
@@ -118,13 +126,12 @@ export class AuthController {
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
   async refresh(
-    @Body() body: RefreshBody,
+    @Body() body: AuthRefreshDto,
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ): Promise<JwtLoginResponse> {
     const refreshToken =
-      this.readCookie(req, REFRESH_COOKIE) ??
-      (typeof body?.refreshToken === 'string' ? body.refreshToken : '');
+      this.readCookie(req, REFRESH_COOKIE) ?? body.refreshToken ?? '';
 
     if (!refreshToken) {
       throw new BadRequestException({
@@ -156,36 +163,6 @@ export class AuthController {
     this.clearAuthCookies(res);
   }
 
-  private requireCredentials(body: LoginBody): {
-    email: string;
-    password: string;
-  } {
-    const email = typeof body?.email === 'string' ? body.email : '';
-    const password = typeof body?.password === 'string' ? body.password : '';
-
-    if (!email || !password) {
-      throw new BadRequestException({
-        code: 'invalid_request',
-        message: 'Vui lòng cung cấp email và mật khẩu.',
-      });
-    }
-
-    return { email, password };
-  }
-
-  private requireLoginClient(
-    body: LoginBody,
-  ): 'student' | 'organizer' | 'staff' {
-    const client = body?.client;
-    if (client === 'student' || client === 'staff' || client === 'organizer') {
-      return client;
-    }
-    throw new BadRequestException({
-      code: 'invalid_request',
-      message: 'Client không hợp lệ.',
-    });
-  }
-
   private readCookie(req: Request, name: string): string | null {
     return (req.cookies as Record<string, string> | undefined)?.[name] ?? null;
   }
@@ -203,7 +180,7 @@ export class AuthController {
   private setRefreshCookie(res: Response, refreshToken: string): void {
     res.cookie(REFRESH_COOKIE, refreshToken, {
       ...this.cookieBase(),
-      maxAge: REFRESH_MS,
+      maxAge: REFRESH_COOKIE_MAX_AGE_SEC,
     });
   }
 
