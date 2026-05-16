@@ -1,3 +1,11 @@
+import type { WorkshopStatus } from '@unihub/types';
+
+export const WORKSHOP_STATUSES: readonly WorkshopStatus[] = [
+  'draft',
+  'published',
+  'cancelled',
+];
+
 export const SESSION_COOKIE = 'unihub_session';
 export const SESSION_TTL_SEC = 30 * 24 * 60 * 60;
 export const SESSION_ID_RANDOM_BYTES = 16;

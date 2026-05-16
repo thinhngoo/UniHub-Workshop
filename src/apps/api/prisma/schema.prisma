@@ -36,3 +36,42 @@ model User {
 
   @@map("users")
 }
+
+enum WorkshopStatus {
+  draft
+  published
+  cancelled
+
+  @@map("workshop_status")
+}
+
+enum WorkshopSummaryStatus {
+  none
+  pending
+  ready
+  failed
+
+  @@map("summary_status")
+}
+
+model Workshop {
+  id             String                 @id @default(uuid()) @db.Uuid
+  title          String
+  speaker        String
+  room           String
+  roomMapUrl     String?                @map("room_map_url")
+  startsAt       DateTime               @map("starts_at") @db.Timestamptz(6)
+  endsAt         DateTime               @map("ends_at") @db.Timestamptz(6)
+  capacity       Int
+  seatsLeft      Int                    @map("seats_left")
+  isPaid         Boolean                @default(false) @map("is_paid")
+  price          Decimal?               @db.Decimal(14, 2)
+  status         WorkshopStatus         @default(draft)
+  summary        String?
+  summaryStatus  WorkshopSummaryStatus  @default(none) @map("summary_status")
+  version        Int                    @default(1)
+  createdAt      DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime               @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@map("workshops")
+}
