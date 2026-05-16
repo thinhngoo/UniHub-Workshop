@@ -21,6 +21,7 @@ import {
   SESSION_TTL_SEC,
 } from '../../constant';
 import { AuthService } from './auth.service';
+import { extractSessionId } from './extract-auth-data';
 import { AuthLoginDto } from './dto/auth-login.dto';
 import { AuthRefreshDto } from './dto/auth-refresh.dto';
 
@@ -97,17 +98,16 @@ export class AuthController {
       });
     }
     this.setRefreshCookie(res, result.refreshToken);
-    return { user: result.user, accessToken: result.accessToken };
+    return {
+      user: result.user,
+      accessToken: result.accessToken,
+    };
   }
 
   @Get('me/session')
   @HttpCode(HttpStatus.OK)
   async meSession(@Req() req: Request): Promise<SessionLoginResponse> {
-    const sessionId =
-      this.readCookie(req, SESSION_COOKIE) ??
-      (typeof req.headers.authorization === 'string'
-        ? req.headers.authorization
-        : '');
+    const sessionId = extractSessionId(req) ?? '';
 
     const user = await this.auth.session(sessionId);
     if (!user) {
@@ -149,7 +149,10 @@ export class AuthController {
     }
 
     this.setRefreshCookie(res, result.refreshToken);
-    return { user: result.user, accessToken: result.accessToken };
+    return {
+      user: result.user,
+      accessToken: result.accessToken,
+    };
   }
 
   @Post('logout')

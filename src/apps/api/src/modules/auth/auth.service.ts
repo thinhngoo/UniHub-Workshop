@@ -80,16 +80,26 @@ export class AuthService {
     return this.users.findUserById(userId);
   }
 
-  async me(token: string | undefined): Promise<User> {
-    if (!token) {
+  async me(data: string | undefined, type: 'jwt' | 'session'): Promise<User> {
+    const trimmed = data?.trim();
+    if (!trimmed) {
       throw new UnauthorizedException({
         code: 'unauthenticated',
         message: 'Phiên đăng nhập không hợp lệ.',
       });
     }
 
-    try {
-      const payload = this.jwt.verify<AccessPayload>(token);
+    if (type === 'jwt') {
+      let payload: AccessPayload;
+      try {
+        payload = this.jwt.verify<AccessPayload>(trimmed);
+      } catch {
+        throw new UnauthorizedException({
+          code: 'unauthenticated',
+          message: 'Phiên đăng nhập không hợp lệ.',
+        });
+      }
+
       const user = await this.users.findUserById(payload.sub);
       if (!user) {
         throw new UnauthorizedException({
@@ -98,18 +108,23 @@ export class AuthService {
         });
       }
       return user;
-    } catch (err: unknown) {
-      if (err instanceof UnauthorizedException) throw err;
-
-      const user = await this.users.findUserById(token);
-      if (!user) {
-        throw new UnauthorizedException({
-          code: 'unauthenticated',
-          message: 'Phiên đăng nhập không hợp lệ.',
-        });
-      }
-      return user;
     }
+
+    const userId = await this.sessionStore.getUserId(trimmed);
+    if (!userId) {
+      throw new UnauthorizedException({
+        code: 'unauthenticated',
+        message: 'Phiên đăng nhập không hợp lệ.',
+      });
+    }
+    const user = await this.users.findUserById(userId);
+    if (!user) {
+      throw new UnauthorizedException({
+        code: 'unauthenticated',
+        message: 'Phiên đăng nhập không hợp lệ.',
+      });
+    }
+    return user;
   }
 
   async logout(sessionId: string | null): Promise<void> {

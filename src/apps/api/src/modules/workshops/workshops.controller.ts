@@ -1,9 +1,19 @@
 import {
+  BadRequestException,
+  Body,
   Controller,
+  Delete,
   Get,
+  HttpCode,
+  HttpStatus,
   NotFoundException,
   Param,
+  Patch,
+  Post,
   Query,
+  UseGuards,
+  UsePipes,
+  ValidationPipe,
 } from '@nestjs/common';
 import type {
   PaginatedResponse,
@@ -12,7 +22,27 @@ import type {
 } from '@unihub/types';
 import { WORKSHOP_STATUSES } from '../../constant';
 import { parsePositiveInt } from '../../utils/parse-positive-int';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { AuthGuard } from '../auth/guards/auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { CreateWorkshopDto } from './dto/create-workshop.dto';
+import { UpdateWorkshopDto } from './dto/update-workshop.dto';
 import { WorkshopsService } from './workshops.service';
+
+const workshopMutationValidationPipe = new ValidationPipe({
+  whitelist: true,
+  transform: true,
+  forbidNonWhitelisted: true,
+  exceptionFactory: (errors: unknown) => {
+    const messages = (
+      errors as { constraints?: Record<string, string> }[]
+    ).flatMap((e) => (e.constraints ? Object.values(e.constraints) : []));
+    return new BadRequestException({
+      code: 'invalid_request',
+      message: messages[0] ?? 'Yêu cầu không hợp lệ.',
+    });
+  },
+});
 
 @Controller('workshops')
 export class WorkshopsController {
@@ -43,6 +73,43 @@ export class WorkshopsController {
       status: statusFilter,
       isPaid: isPaidFilter,
     });
+  }
+
+  @Post()
+  @HttpCode(HttpStatus.CREATED)
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles('admin', 'organizer')
+  @UsePipes(workshopMutationValidationPipe)
+  async create(@Body() body: CreateWorkshopDto): Promise<Workshop> {
+    return this.workshops.createWorkshop(body);
+  }
+
+  @Post(':id/reserve-seat')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles('student')
+  async reserveSeat(@Param('id') id: string): Promise<{ reserved: true }> {
+    await this.workshops.reserveSeat(id);
+    return { reserved: true };
+  }
+
+  @Patch(':id')
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles('admin', 'organizer')
+  @UsePipes(workshopMutationValidationPipe)
+  async update(
+    @Param('id') id: string,
+    @Body() body: UpdateWorkshopDto,
+  ): Promise<Workshop> {
+    return this.workshops.updateWorkshop(id, body);
+  }
+
+  @Delete(':id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles('admin', 'organizer')
+  async remove(@Param('id') id: string): Promise<void> {
+    await this.workshops.deleteWorkshop(id);
   }
 
   @Get(':id')

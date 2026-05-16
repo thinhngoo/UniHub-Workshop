@@ -1,9 +1,16 @@
-import type { WorkshopStatus } from '@unihub/types';
+import type { SummaryStatus, WorkshopStatus } from '@unihub/types';
 
 export const WORKSHOP_STATUSES: readonly WorkshopStatus[] = [
   'draft',
   'published',
   'cancelled',
+];
+
+export const SUMMARY_STATUSES: readonly SummaryStatus[] = [
+  'none',
+  'pending',
+  'ready',
+  'failed',
 ];
 
 export const SESSION_COOKIE = 'unihub_session';

@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useMemo, useState } from 'react';
-import { ArrowLeft, BookOpen, CalendarDays, MapPin, Users } from 'lucide-react';
+import { ArrowLeft, BookOpen, CalendarDays, Image as ImageIcon, MapPin, Users } from 'lucide-react';
 import { ApiError, generateIdempotencyKey } from '@unihub/api-client';
 import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
@@ -26,17 +26,20 @@ export function WorkshopDetailPage() {
   });
 
   const registerMutation = useMutation({
-    mutationFn: () => api.registrations.create({ workshopId: id! }, idempotencyKey),
+    mutationFn: async () => {
+      await api.workshops.tryReserveSeat(id!);
+      // return api.registrations.create({ workshopId: id! }, idempotencyKey);
+    },
     onSuccess: (res) => {
       qc.invalidateQueries({ queryKey: ['workshop', id] });
       qc.invalidateQueries({ queryKey: ['my-registrations'] });
-      if (res.paymentRequired) {
-        navigate(`/me/registrations/${res.registration.id}/qr`, {
-          state: { paymentPending: true },
-        });
-      } else {
-        navigate(`/me/registrations/${res.registration.id}/qr`);
-      }
+      // if (res.paymentRequired) {
+      //   navigate(`/me/registrations/${res.registration.id}/qr`, {
+      //     state: { paymentPending: true },
+      //   });
+      // } else {
+      //   navigate(`/me/registrations/${res.registration.id}/qr`);
+      // }
     },
     onError: (e: unknown) => {
       if (e instanceof ApiError) setError(e.message);
@@ -181,6 +184,37 @@ export function WorkshopDetailPage() {
             )}
           </CardContent>
         </Card>
+
+        {workshop.roomMapUrl ? (
+          <Card className="order-4 lg:order-0 lg:col-span-2">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <ImageIcon className="h-5 w-5 text-brand-600" aria-hidden />
+                Ảnh & sơ đồ phòng
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <img
+                src={workshop.roomMapUrl}
+                alt={`Ảnh hoặc sơ đồ phòng — ${workshop.room}`}
+                className="max-h-[min(480px,70vh)] w-full rounded-lg border border-slate-200 bg-slate-50 object-contain"
+                loading="lazy"
+              />
+              <p className="text-xs text-slate-500">
+                Bạn cũng có thể{' '}
+                <a
+                  href={workshop.roomMapUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-brand-600 hover:underline"
+                >
+                  mở liên kết trong tab mới
+                </a>
+                .
+              </p>
+            </CardContent>
+          </Card>
+        ) : null}
       </div>
     </div>
   );

@@ -48,4 +48,6 @@ export interface CreateWorkshopRequest {
 export interface UpdateWorkshopRequest extends Partial<CreateWorkshopRequest> {
   version: number;
   status?: WorkshopStatus;
+  summary?: string | null;
+  summaryStatus?: SummaryStatus;
 }

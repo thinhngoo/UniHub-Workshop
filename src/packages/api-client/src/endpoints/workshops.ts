@@ -14,10 +14,16 @@ export const workshopsApi = (http: AxiosInstance) => ({
       .get<PaginatedResponse<Workshop>>('/workshops', { params: query })
       .then((r) => r.data),
   getById: (id: UUID) => http.get<Workshop>(`/workshops/${id}`).then((r) => r.data),
+  tryReserveSeat: (id: UUID) =>
+    http
+      .post<{ reserved: true }>(`/workshops/${id}/reserve-seat`)
+      .then((r) => r.data),
   create: (body: CreateWorkshopRequest) =>
     http.post<Workshop>('/workshops', body).then((r) => r.data),
   update: (id: UUID, body: UpdateWorkshopRequest) =>
     http.patch<Workshop>(`/workshops/${id}`, body).then((r) => r.data),
+  remove: (id: UUID) =>
+    http.delete(`/workshops/${id}`).then(() => undefined),
   cancel: (id: UUID, version: number) =>
     http
       .post<Workshop>(`/workshops/${id}/cancel`, { version })

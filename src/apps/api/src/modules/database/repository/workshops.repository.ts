@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
-import type { Prisma, Workshop as DbWorkshop } from '@prisma/client';
+import { Prisma, type Workshop as DbWorkshop } from '@prisma/client';
 import type {
+  CreateWorkshopRequest,
   Workshop as DomainWorkshop,
   WorkshopListQuery,
 } from '@unihub/types';
@@ -99,5 +100,64 @@ export class WorkshopsRepository {
       data: { seatsLeft: { decrement: 1 } },
     });
     return result.count === 1;
+  }
+
+  async create(input: CreateWorkshopRequest): Promise<DomainWorkshop> {
+    const row = await this.prisma.workshop.create({
+      data: {
+        title: input.title.trim(),
+        speaker: input.speaker.trim(),
+        room: input.room.trim(),
+        roomMapUrl: input.roomMapUrl?.trim() ? input.roomMapUrl.trim() : null,
+        startsAt: new Date(input.startsAt),
+        endsAt: new Date(input.endsAt),
+        capacity: input.capacity,
+        seatsLeft: input.capacity,
+        isPaid: input.isPaid,
+        price:
+          input.isPaid && input.price != null
+            ? new Prisma.Decimal(input.price)
+            : null,
+        status: 'draft',
+        summary: null,
+        summaryStatus: 'none',
+        version: 1,
+      },
+    });
+    return this.toDomain(row);
+  }
+
+  async updateWithOptimisticLock(
+    id: string,
+    expectedVersion: number,
+    data: Prisma.WorkshopUpdateManyMutationInput,
+  ): Promise<DomainWorkshop | null> {
+    const result = await this.prisma.workshop.updateMany({
+      where: { id, version: expectedVersion },
+      data: {
+        ...data,
+        version: { increment: 1 },
+      },
+    });
+    if (result.count !== 1) return null;
+    const row = await this.prisma.workshop.findUnique({ where: { id } });
+    return row ? this.toDomain(row) : null;
+  }
+
+  async deleteById(id: string): Promise<boolean> {
+    try {
+      await this.prisma.workshop.delete({ where: { id } });
+      return true;
+    } catch (e: unknown) {
+      if (
+        typeof e === 'object' &&
+        e !== null &&
+        'code' in e &&
+        (e as { code: string }).code === 'P2025'
+      ) {
+        return false;
+      }
+      throw e;
+    }
   }
 }

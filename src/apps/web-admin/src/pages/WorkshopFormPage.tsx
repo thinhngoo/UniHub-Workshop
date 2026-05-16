@@ -5,11 +5,33 @@ import { z } from 'zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ApiError } from '@unihub/api-client';
-import type { CreateWorkshopRequest, UpdateWorkshopRequest } from '@unihub/types';
+import type { CreateWorkshopRequest, UpdateWorkshopRequest, WorkshopStatus } from '@unihub/types';
+import { cn } from '@unihub/format/cn';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { api } from '@/lib/api';
+
+const WORKSHOP_STATUSES = [
+  'draft',
+  'published',
+  'cancelled',
+] as const satisfies readonly WorkshopStatus[];
+
+const WORKSHOP_STATUS_LABEL: Record<WorkshopStatus, string> = {
+  draft: 'Nháp',
+  published: 'Đang mở',
+  cancelled: 'Đã hủy',
+};
 
 const schema = z
   .object({
@@ -22,6 +44,7 @@ const schema = z
     capacity: z.coerce.number().int().min(1, 'Sức chứa tối thiểu 1'),
     isPaid: z.boolean(),
     price: z.coerce.number().int().min(0).optional(),
+    status: z.enum(WORKSHOP_STATUSES),
   })
   .refine((d) => new Date(d.endsAt) > new Date(d.startsAt), {
     message: 'Kết thúc phải sau bắt đầu',
@@ -43,6 +66,8 @@ export function WorkshopFormPage({ mode }: Props) {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [serverError, setServerError] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
   const existingQuery = useQuery({
     queryKey: ['workshop', id],
@@ -68,6 +93,7 @@ export function WorkshopFormPage({ mode }: Props) {
       capacity: 30,
       isPaid: false,
       price: 0,
+      status: 'draft',
     },
   });
 
@@ -86,6 +112,7 @@ export function WorkshopFormPage({ mode }: Props) {
         capacity: w.capacity,
         isPaid: w.isPaid,
         price: w.price ?? 0,
+        status: w.status,
       });
     }
   }, [mode, existingQuery.data, reset]);
@@ -111,6 +138,17 @@ export function WorkshopFormPage({ mode }: Props) {
       setServerError(e instanceof ApiError ? e.message : 'Không thể cập nhật workshop.'),
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: () => api.workshops.remove(id!),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin-workshops'] });
+      qc.removeQueries({ queryKey: ['workshop', id] });
+      navigate('/workshops');
+    },
+    onError: (e: unknown) =>
+      setDeleteError(e instanceof ApiError ? e.message : 'Không thể xóa workshop.'),
+  });
+
   const onSubmit = (values: FormValues) => {
     setServerError(null);
     const payload = {
@@ -127,7 +165,11 @@ export function WorkshopFormPage({ mode }: Props) {
     if (mode === 'create') {
       createMutation.mutate(payload);
     } else if (existingQuery.data) {
-      updateMutation.mutate({ ...payload, version: existingQuery.data.version });
+      updateMutation.mutate({
+        ...payload,
+        version: existingQuery.data.version,
+        status: values.status,
+      });
     }
   };
 
@@ -161,7 +203,11 @@ export function WorkshopFormPage({ mode }: Props) {
               <Input {...register('room')} />
             </Field>
 
-            <Field label="URL sơ đồ phòng" error={errors.roomMapUrl?.message} className="sm:col-span-2">
+            <Field
+              label="URL sơ đồ phòng"
+              error={errors.roomMapUrl?.message}
+              className="sm:col-span-2"
+            >
               <Input {...register('roomMapUrl')} placeholder="https://…" />
             </Field>
 
@@ -176,6 +222,24 @@ export function WorkshopFormPage({ mode }: Props) {
             <Field label="Sức chứa" error={errors.capacity?.message}>
               <Input type="number" min={1} {...register('capacity')} />
             </Field>
+
+            {mode === 'edit' && (
+              <Field label="Trạng thái" error={errors.status?.message}>
+                <select
+                  {...register('status')}
+                  className={cn(
+                    'flex h-10 w-full cursor-pointer rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900',
+                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500',
+                  )}
+                >
+                  {WORKSHOP_STATUSES.map((s) => (
+                    <option key={s} value={s}>
+                      {WORKSHOP_STATUS_LABEL[s]}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+            )}
 
             <div className="space-y-1.5">
               <label className="text-sm font-medium text-slate-700">Loại workshop</label>
@@ -198,7 +262,12 @@ export function WorkshopFormPage({ mode }: Props) {
             )}
 
             <div className="sm:col-span-2 flex justify-end gap-2">
-              <Button type="button" variant="secondary" onClick={() => navigate('/workshops')} className="cursor-pointer">
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => navigate('/workshops')}
+                className="cursor-pointer"
+              >
                 Hủy
               </Button>
               <Button type="submit" disabled={isSubmitting} className="cursor-pointer">
@@ -208,6 +277,78 @@ export function WorkshopFormPage({ mode }: Props) {
           </form>
         </CardContent>
       </Card>
+
+      {mode === 'edit' && id && (
+        <>
+          <Card className="overflow-hidden border-red-200 bg-red-50/90 shadow-none">
+            <CardContent className="p-5">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0 space-y-1 sm:pr-6">
+                  <h3 className="text-base font-semibold text-red-900">Xóa workshop này</h3>
+                  <p className="text-sm text-red-800/85">
+                    Sau khi xóa workshop, không thể khôi phục. Hãy chắc chắn trước khi thực hiện.
+                  </p>
+                </div>
+                <div className="flex shrink-0 sm:justify-end">
+                  <button
+                    type="button"
+                    disabled={deleteMutation.isPending || existingQuery.isPending}
+                    className="cursor-pointer rounded-md border border-red-400 bg-white px-4 py-2 text-sm font-semibold text-red-700 shadow-sm transition-colors hover:border-red-500 hover:bg-red-100 hover:text-red-900 disabled:pointer-events-none disabled:opacity-50"
+                    onClick={() => {
+                      setDeleteError(null);
+                      setDeleteDialogOpen(true);
+                    }}
+                  >
+                    Xóa workshop này
+                  </button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Dialog
+            open={deleteDialogOpen}
+            onOpenChange={(open) => {
+              setDeleteDialogOpen(open);
+              if (!open) setDeleteError(null);
+            }}
+          >
+            <DialogContent className="max-w-md border-red-100">
+              <DialogHeader>
+                <DialogTitle className="text-red-900">Xóa workshop này?</DialogTitle>
+                <DialogDescription className="text-red-950/70">
+                  Workshop{' '}
+                  <span className="font-medium text-red-900">
+                    «{existingQuery.data?.title ?? '…'}»
+                  </span>{' '}
+                  sẽ bị xóa vĩnh viễn. Thao tác này không thể hoàn tác.
+                </DialogDescription>
+              </DialogHeader>
+              {deleteError && (
+                <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                  {deleteError}
+                </div>
+              )}
+              <DialogFooter>
+                <DialogClose asChild>
+                  <Button type="button" variant="secondary" className="cursor-pointer">
+                    Hủy
+                  </Button>
+                </DialogClose>
+                <Button
+                  type="button"
+                  variant="danger"
+                  className="cursor-pointer"
+                  disabled={deleteMutation.isPending}
+                  onClick={() => deleteMutation.mutate()}
+                >
+                  {deleteMutation.isPending ? 'Đang xóa…' : 'Xóa workshop'}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </>
+      )}
     </div>
   );
 }
