@@ -11,6 +11,7 @@ import {
   UsePipes,
   ValidationPipe,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import type {
   InitiatePaymentResponse,
   Payment as PaymentDto,
@@ -20,6 +21,7 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { AuthGuard } from '../auth/guards/auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
+import { THROTTLE_PAYMENT_INITIATE } from '../../throttle-presets';
 import { InitiatePaymentDto } from './dto/initiate-payment.dto';
 import { PaymentsService } from './payments.service';
 
@@ -51,6 +53,7 @@ export class PaymentsController {
   }
 
   @Post()
+  @Throttle(THROTTLE_PAYMENT_INITIATE)
   @HttpCode(HttpStatus.OK)
   @UseGuards(RolesGuard)
   @Roles('student')

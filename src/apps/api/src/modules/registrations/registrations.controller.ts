@@ -12,6 +12,7 @@ import {
   UsePipes,
   ValidationPipe,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import type {
   CreateRegistrationResponse,
   Payment,
@@ -23,6 +24,7 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { AuthGuard } from '../auth/guards/auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { PaymentsService } from '../payments/payments.service';
+import { THROTTLE_REGISTRATION_CREATE } from '../../throttle-presets';
 import { CreateRegistrationDto } from './dto/create-registration.dto';
 import { RegistrationsService } from './registrations.service';
 
@@ -55,6 +57,7 @@ export class RegistrationsController {
   }
 
   @Post()
+  @Throttle(THROTTLE_REGISTRATION_CREATE)
   @HttpCode(HttpStatus.CREATED)
   @UseGuards(RolesGuard)
   @Roles('student')

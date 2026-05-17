@@ -12,6 +12,7 @@ import {
   UsePipes,
   ValidationPipe,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import type { Request, Response } from 'express';
 import type { JwtLoginResponse, SessionLoginResponse } from '@unihub/types';
 import {
@@ -20,6 +21,10 @@ import {
   SESSION_COOKIE,
   SESSION_TTL_SEC,
 } from '../../constant';
+import {
+  THROTTLE_AUTH_LOGIN,
+  THROTTLE_AUTH_REFRESH,
+} from '../../throttle-presets';
 import { AuthService } from './auth.service';
 import { extractSessionId } from './extract-auth-data';
 import { AuthLoginDto } from './dto/auth-login.dto';
@@ -61,6 +66,7 @@ export class AuthController {
   }
 
   @Post('login/session')
+  @Throttle(THROTTLE_AUTH_LOGIN)
   @HttpCode(HttpStatus.OK)
   async loginSession(
     @Body() body: AuthLoginDto,
@@ -76,6 +82,7 @@ export class AuthController {
   }
 
   @Get('me/jwt')
+  @Throttle(THROTTLE_AUTH_REFRESH)
   @HttpCode(HttpStatus.OK)
   async meJwt(
     @Req() req: Request,
@@ -124,6 +131,7 @@ export class AuthController {
   }
 
   @Post('refresh')
+  @Throttle(THROTTLE_AUTH_REFRESH)
   @HttpCode(HttpStatus.OK)
   async refresh(
     @Body() body: AuthRefreshDto,

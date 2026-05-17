@@ -9,6 +9,7 @@ import {
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { InjectQueue } from '@nestjs/bullmq';
 import type {
@@ -25,6 +26,7 @@ import {
   STUDENT_SYNC_MAX_FILE_BYTES,
   STUDENT_SYNC_QUEUE,
 } from '../../constant';
+import { THROTTLE_STUDENT_SYNC_UPLOAD } from '../../throttle-presets';
 import type { StudentSyncJobPayload } from './student-sync';
 
 /** Fields used from Multer's uploaded file (memory storage). */
@@ -59,6 +61,7 @@ export class StudentSyncController {
   ) {}
 
   @Post()
+  @Throttle(THROTTLE_STUDENT_SYNC_UPLOAD)
   @UseInterceptors(
     FileInterceptor('file', {
       limits: { fileSize: STUDENT_SYNC_MAX_FILE_BYTES },

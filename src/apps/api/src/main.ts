@@ -7,6 +7,11 @@ import { AppModule } from './app.module';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   app.enableShutdownHooks();
+
+  const trustProxyEnv = process.env.TRUST_PROXY?.toLowerCase();
+  if (trustProxyEnv === '1' || trustProxyEnv === 'true') {
+    app.getHttpAdapter().getInstance().set('trust proxy', 1);
+  }
   const httpLogger = new Logger('HTTP');
 
   app.use(cookieParser());
