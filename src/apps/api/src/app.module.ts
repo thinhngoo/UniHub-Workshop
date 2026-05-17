@@ -6,13 +6,11 @@ import { CheckinModule } from './modules/checkin/checkin.module';
 import { DatabaseModule } from './modules/database/database.module';
 import { RegistrationsModule } from './modules/registrations/registrations.module';
 import { WorkshopsModule } from './modules/workshops/workshops.module';
-import { RedisModule } from './modules/redis/redis.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     DatabaseModule,
-    RedisModule,
     AuthModule,
     WorkshopsModule,
     RegistrationsModule,

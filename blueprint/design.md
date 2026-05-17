@@ -41,7 +41,6 @@ flowchart TB
 ```
 
 
-
 ## Bảo mật
 
 **Authentication**:
@@ -63,10 +62,26 @@ flowchart TB
 | `staff`     | `checkin:create`, `checkin:batch_sync`, `registration:read(byqr)`                                                               |
 | `admin`     | All                                                                                                                             |
 
+## Cơ sở dữ liệu
+
+### Lựa chọn loại database
+
+Dùng **Relational DB (SQL)** làm kho dữ liệu chính, kết hợp với **key-value store** cho dữ liệu tạm thời và **object storage** cho blob.
+
+| Loại dữ liệu                                                              | Storage             | Lý do                                                                                         |
+| ------------------------------------------------------------------------- | ------------------- | --------------------------------------------------------------------------------------------- |
+| User, Role, Workshop, Registration, Payment, CheckIn, AuditLog            | **Relational DB**   | Cần ACID cho nghiệp vụ giữ chỗ và thanh toán; quan hệ giữa các entity rõ ràng; query thống kê |
+| Rate-limit counter, Idempotency key, Circuit breaker state, Session cache | **KV / in-memory**  | Truy cập nhiều, TTL ngắn, không cần bền vững tuyệt đối                                        |
+| PDF gốc, file QR PNG/SVG, CSV gốc                                         | **Object Storage**  | Blob lớn, không truy vấn theo nội dung, chỉ cần URL                                           |
+
+### Schema
+
+
+
 
 ## Tech-stack
 
-**Web App (Sinh viên + Admin) — React + Vite + TypeScript**:
+**Web App (Sinh viên + Admin) → React + Vite + TypeScript**:
 
 - Phổ biến, hệ sinh thái lớn, nhiều thư viện và tài liệu hỗ trợ.
 - Là UI library thay vì framework hoàn chỉnh, giúp **linh hoạt** và nhẹ hơn so với Angular.
@@ -74,13 +89,13 @@ flowchart TB
 - Sử dụng Vite để tối ưu tốc độ phát triển và build.
 - Không sử dụng SSR nhằm giảm tải xử lý phía server trong các giai đoạn truy cập tăng đột biến.
 
-**Mobile App (Nhân sự) — React Native**:
+**Mobile App (Nhân sự) → React Native**:
 
 - **Cross-platform** nhằm giảm công sức phát triển và bảo trì so với xây dựng native riêng cho từng nền tảng.
 - Tận dụng chung hệ sinh thái React để tái sử dụng API client, types và một phần business logic từ web app, thay vì sử dụng Dart như Flutter.
 - Local storage sử dụng Expo SQLite cho check-in offline. Cân nhắc chuyển sang WatermelonDB khi dữ liệu hoặc nhu cầu đồng bộ tăng lớn hơn.
 
-**Backend — NestJS (Node.js + TypeScript)**:
+**Backend → NestJS (Node.js + TypeScript)**:
 
 - Kiến trúc **module-based** phù hợp với mô hình Modular Monolith đã chọn, trong đó mỗi nghiệp vụ được tổ chức thành một module riêng của NestJS.
 - **Dependency Injection** tích hợp sẵn, giúp dễ kiểm thử và dễ thay thế implementation giữa các thành phần (ví dụ notification service).
@@ -92,10 +107,11 @@ flowchart TB
 	- `@nestjs/throttler` cho rate limiting phía application.
 	- Guards và interceptors phù hợp để triển khai RBAC và cross-cutting concerns.
 
-**Database**
+**Others**
 
-- **Relational DB → PostgreSQL**: hỗ trợ mạnh về các tính năng SQL như transaction, JSONB, CTE...
-	- ORM dùng **Prisma**
+- **Relational DB → PostgreSQL + Prisma**: hỗ trợ mạnh về các tính năng SQL như transaction, JSONB, CTE...
+- **In-memory store → Redis**: mặc định.
+- **Message broker → Redis Streams + BullMQ**: cân nhắc **RabbitMQ** nếu cần nhiều consumer pattern phức tạp.
 
 
 ## Các quyết định kỹ thuật
