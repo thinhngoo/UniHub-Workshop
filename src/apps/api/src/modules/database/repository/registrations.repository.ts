@@ -8,21 +8,40 @@ type RegisterSeatFailure =
   | 'workshop_not_found'
   | 'workshop_not_open'
   | 'already_registered'
-  | 'no_seats';
+  | 'no_seats'
+  | 'idempotency_required'
+  | 'workshop_missing_price'
+  | 'idempotency_conflict';
 
 type RegisterSeatResult =
-  | { ok: true; registration: DomainRegistration }
+  | {
+      ok: true;
+      registration: DomainRegistration;
+      paymentIntentId: string | null;
+    }
   | { ok: false; error: RegisterSeatFailure };
 
 function addMinutes(date: Date, minutes: number): Date {
   return new Date(date.getTime() + minutes * 60_000);
 }
 
+function isUniqueOnIdempotencyKey(
+  e: Prisma.PrismaClientKnownRequestError,
+): boolean {
+  const t = e.meta?.target as string | string[] | undefined;
+  if (Array.isArray(t)) {
+    return t.some(
+      (x) => typeof x === 'string' && x.toLowerCase().includes('idempotency'),
+    );
+  }
+  return typeof t === 'string' && t.toLowerCase().includes('idempotency');
+}
+
 @Injectable()
 export class RegistrationsRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  private toDomain(row: DbRegistration): DomainRegistration {
+  toDomain(row: DbRegistration): DomainRegistration {
     return {
       id: row.id,
       userId: row.userId,
@@ -37,11 +56,13 @@ export class RegistrationsRepository {
 
   /**
    * Single transaction: validate workshop, reject duplicate active registration,
-   * decrement seats_left (conditional), insert registration.
+   * decrement seats_left (conditional), insert registration; for paid workshops,
+   * insert pending payment (idempotency_key unique).
    */
   async registerWithSeatTransaction(
     userId: string,
     workshopId: string,
+    opts?: { idempotencyKey?: string },
   ): Promise<RegisterSeatResult> {
     try {
       const outcome = await this.prisma.$transaction(async (tx) => {
@@ -56,6 +77,23 @@ export class RegistrationsRepository {
         }
         if (workshop.status !== 'published') {
           return { kind: 'fail' as const, error: 'workshop_not_open' as const };
+        }
+
+        const isPaid = workshop.isPaid;
+        if (isPaid) {
+          const key = opts?.idempotencyKey?.trim();
+          if (!key) {
+            return {
+              kind: 'fail' as const,
+              error: 'idempotency_required' as const,
+            };
+          }
+          if (workshop.price == null) {
+            return {
+              kind: 'fail' as const,
+              error: 'workshop_missing_price' as const,
+            };
+          }
         }
 
         const dup = await tx.registration.findFirst({
@@ -81,7 +119,6 @@ export class RegistrationsRepository {
         }
 
         const now = new Date();
-        const isPaid = workshop.isPaid;
         const row = await tx.registration.create({
           data: {
             userId,
@@ -95,18 +132,40 @@ export class RegistrationsRepository {
               : `qrtok_${randomUUID().replace(/-/g, '').slice(0, 16)}`,
           },
         });
-        return { kind: 'ok' as const, row };
+
+        let paymentIntentId: string | null = null;
+        if (isPaid) {
+          const pay = await tx.payment.create({
+            data: {
+              registrationId: row.id,
+              idempotencyKey: opts!.idempotencyKey!.trim(),
+              amount: workshop.price!,
+              status: 'pending',
+              attemptCount: 0,
+            },
+          });
+          paymentIntentId = pay.id;
+        }
+
+        return { kind: 'ok' as const, row, paymentIntentId };
       });
 
       if (outcome.kind === 'fail') {
         return { ok: false, error: outcome.error };
       }
-      return { ok: true, registration: this.toDomain(outcome.row) };
+      return {
+        ok: true,
+        registration: this.toDomain(outcome.row),
+        paymentIntentId: outcome.paymentIntentId,
+      };
     } catch (e) {
       if (
         e instanceof Prisma.PrismaClientKnownRequestError &&
         e.code === 'P2002'
       ) {
+        if (isUniqueOnIdempotencyKey(e)) {
+          return { ok: false, error: 'idempotency_conflict' };
+        }
         return { ok: false, error: 'already_registered' };
       }
       throw e;

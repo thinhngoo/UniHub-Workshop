@@ -32,9 +32,7 @@ export function WorkshopDetailPage() {
       qc.invalidateQueries({ queryKey: ['workshop', id] });
       qc.invalidateQueries({ queryKey: ['my-registrations'] });
       if (res.paymentRequired) {
-        navigate(`/me/registrations/${res.registration.id}/qr`, {
-          state: { paymentPending: true },
-        });
+        navigate(`/me/registrations/${res.registration.id}/payment`);
       } else {
         navigate(`/me/registrations/${res.registration.id}/qr`);
       }

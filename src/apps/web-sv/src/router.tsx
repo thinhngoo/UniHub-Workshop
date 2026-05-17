@@ -6,6 +6,7 @@ import { LoginPage } from '@/pages/LoginPage';
 import { WorkshopListPage } from '@/pages/WorkshopListPage';
 import { WorkshopDetailPage } from '@/pages/WorkshopDetailPage';
 import { MyRegistrationsPage } from '@/pages/MyRegistrationsPage';
+import { RegistrationPaymentPage } from '@/pages/RegistrationPaymentPage';
 import { QrPage } from '@/pages/QrPage';
 import { NotFoundPage } from '@/pages/NotFoundPage';
 
@@ -31,6 +32,14 @@ export const router = createBrowserRouter([
         element: (
           <RequireAuth>
             <MyRegistrationsPage />
+          </RequireAuth>
+        ),
+      },
+      {
+        path: 'me/registrations/:id/payment',
+        element: (
+          <RequireAuth>
+            <RegistrationPaymentPage />
           </RequireAuth>
         ),
       },

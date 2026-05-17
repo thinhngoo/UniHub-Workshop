@@ -5,6 +5,7 @@ import { encodeDatabaseUrl } from './encode-database-url';
 import { InMemoryAppDataStore } from './in-memory-app-data.store';
 import { PrismaService } from './prisma.service';
 import { RedisService } from './redis.service';
+import { PaymentsRepository } from './repository/payments.repository';
 import { RegistrationsRepository } from './repository/registrations.repository';
 import { UsersRepository } from './repository/users.repository';
 import { WorkshopsRepository } from './repository/workshops.repository';
@@ -29,6 +30,7 @@ import { WorkshopsRepository } from './repository/workshops.repository';
     UsersRepository,
     WorkshopsRepository,
     RegistrationsRepository,
+    PaymentsRepository,
     {
       provide: AppDataStore,
       useClass: InMemoryAppDataStore,
@@ -42,6 +44,7 @@ import { WorkshopsRepository } from './repository/workshops.repository';
     UsersRepository,
     WorkshopsRepository,
     RegistrationsRepository,
+    PaymentsRepository,
   ],
 })
 export class DatabaseModule {}

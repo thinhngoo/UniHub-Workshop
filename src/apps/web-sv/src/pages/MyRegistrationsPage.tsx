@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { CalendarDays, MapPin, QrCode } from 'lucide-react';
+import { CalendarDays, MapPin, QrCode, CreditCard } from 'lucide-react';
 import type { Registration } from '@unihub/types';
 import { api } from '@/lib/api';
 import { Card, CardContent } from '@/components/ui/card';
@@ -79,14 +79,25 @@ export function MyRegistrationsPage() {
                 </div>
               </div>
 
-              {reg.status === 'confirmed' ? (
-                <Link
-                  to={`/me/registrations/${reg.id}/qr`}
-                  className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 px-3 py-1.5 text-sm text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-50"
-                >
-                  <QrCode className="size-4" /> Xem mã QR
-                </Link>
-              ) : null}
+              <div className="flex shrink-0 flex-col items-stretch gap-2 sm:items-end">
+                {reg.status === 'confirmed' ? (
+                  <Link
+                    to={`/me/registrations/${reg.id}/qr`}
+                    className="inline-flex items-center justify-center gap-1.5 rounded-md border border-slate-200 px-3 py-1.5 text-sm text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-50"
+                  >
+                    <QrCode className="size-4" /> Xem mã QR
+                  </Link>
+                ) : null}
+
+                {reg.status === 'reserved' && reg.workshop?.isPaid ? (
+                  <Link
+                    to={`/me/registrations/${reg.id}/payment`}
+                    className="inline-flex items-center justify-center gap-1.5 rounded-md border border-amber-200 bg-amber-50 px-3 py-1.5 text-sm text-amber-900 transition-colors hover:bg-amber-100"
+                  >
+                    <CreditCard className="size-4" /> Thanh toán
+                  </Link>
+                ) : null}
+              </div>
             </CardContent>
           </Card>
         ))}

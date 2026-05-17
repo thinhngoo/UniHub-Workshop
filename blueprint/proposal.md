@@ -8,7 +8,6 @@ Trường Đại học A tổ chức sự kiện "Tuần lễ kỹ năng và ngh
 
 Hiện tại, ban tổ chức quản lý đăng ký bằng Google Form và gửi thông báo qua email thủ công. Khi quy mô sự kiện ngày càng lớn, quy trình này không còn đáp ứng được yêu cầu thực tế.
 
-
 ---
 
 ## 2. Vấn đề
@@ -24,7 +23,6 @@ Quy trình hiện tại dựa trên Google Form + email thủ công có nhiều 
 
 **Hậu quả:** mỗi mùa sự kiện, ban tổ chức phải xử lý thủ công hàng trăm trường hợp đăng ký trùng, tranh chấp chỗ ngồi, thanh toán không khớp và check-in nhầm người. Chi phí vận hành và tỉ lệ sai sót đều tăng theo quy mô.
 
-
 ---
 
 ## 3. Mục tiêu
@@ -33,17 +31,18 @@ Xây dựng hệ thống UniHub Workshop số hóa toàn bộ quy trình từ đ
 
 - **Số hóa end-to-end**: Loại bỏ hoàn toàn khâu xử lý thủ công trong đăng ký, xác nhận, thanh toán, thông báo và check-in.
 - **Functional**:
-	- **Check-in liên tục kể cả offline**: Mobile app check-in phải hoạt động ngay cả khi **mất kết nối mạng**; dữ liệu tự đồng bộ khi mạng trở lại và **không được mất**.
-	- **Đồng bộ dữ liệu sinh viên an toàn**: Tự động nhập CSV hằng đêm, xử lý được file lỗi / dữ liệu trùng / thiếu cột mà không làm gián đoạn hệ thống đang chạy.
-	- **Phân quyền chặt chẽ**: Ba nhóm người dùng (sinh viên, ban tổ chức, nhân sự check-in) có phạm vi truy cập khác biệt rõ ràng.
-	- **Thông báo có thể mở rộng**: Hệ thống thông báo hỗ trợ app + email ngay từ đầu, và **dễ dàng bổ sung kênh mới** (ví dụ Telegram) trong các học kỳ sau mà không cần thay đổi lớn về kiến trúc.
-	- **AI Summary cho workshop**: Cho phép ban tổ chức upload PDF giới thiệu workshop; hệ thống tự động trích xuất, làm sạch và sinh bản tóm tắt hiển thị trên trang chi tiết workshop.
+  - **Check-in liên tục kể cả offline**: Mobile app check-in phải hoạt động ngay cả khi **mất kết nối mạng**; dữ liệu tự đồng bộ khi mạng trở lại và **không được mất**.
+  - **Đồng bộ dữ liệu sinh viên an toàn**: Tự động nhập CSV hằng đêm, xử lý được file lỗi / dữ liệu trùng / thiếu cột mà không làm gián đoạn hệ thống đang chạy.
+  - **Phân quyền chặt chẽ**: Ba nhóm người dùng (sinh viên, ban tổ chức, nhân sự check-in) có phạm vi truy cập khác biệt rõ ràng.
+  - **Thông báo có thể mở rộng**: Hệ thống thông báo hỗ trợ app + email ngay từ đầu, và **dễ dàng bổ sung kênh mới** (ví dụ Telegram) trong các học kỳ sau mà không cần thay đổi lớn về kiến trúc.
+  - **AI Summary cho workshop**: Cho phép ban tổ chức upload PDF giới thiệu workshop; hệ thống tự động trích xuất, làm sạch và sinh bản tóm tắt hiển thị trên trang chi tiết workshop.
 - **Non-functional**:
-	- **Nhất quán tuyệt đối về chỗ ngồi**: Đảm bảo không có hai sinh viên nào **cùng nhận chung 1 chỗ** của bất kỳ workshop nào (strong consistency), kể cả khi request đến đồng thời.
-	- **An toàn giao dịch**: Đảm bảo mỗi giao dịch thanh toán chỉ được **thực hiện đúng một lần**, ngay cả khi client retry nhiều lần hoặc cổng thanh toán gặp sự cố.
-	- **Chịu tải đột biến**: Hỗ trợ tối thiểu **12.000 sinh viên** truy cập trong **10 phút đầu** khi mở đăng ký (trong đó **60% dồn vào 3 phút đầu tiên**) mà không downtime, không mất dữ liệu và đảm bảo công bằng giữa các sinh viên.
-	- **Cô lập sự cố thanh toán**: Khi cổng thanh toán lỗi kéo dài, các tính năng không liên quan (xem lịch, xem thông tin workshop, workshop miễn phí…) vẫn phải hoạt động bình thường.
-
+  - **Nhất quán tuyệt đối về chỗ ngồi**: Đảm bảo không có hai sinh viên nào **cùng nhận chung 1 chỗ** của bất kỳ workshop nào (strong consistency), kể cả khi request đến đồng thời.
+  - **An toàn giao dịch**: Đảm bảo mỗi giao dịch thanh toán chỉ được **thực hiện đúng một lần**, ngay cả khi client retry nhiều lần hoặc cổng thanh toán gặp sự cố.
+  - **Chịu tải đột biến**: Hỗ trợ tối thiểu **12.000 sinh viên** truy cập trong **10 phút đầu** khi mở đăng ký (trong đó **60% dồn vào 3 phút đầu tiên**) mà không mất dữ liệu và đảm bảo công bằng giữa các sinh viên. Trong kịch bản tải đó:
+    - **TPS**: load test đạt tối thiểu **~300 TPS** cho các API đọc lịch workshop và đăng ký (peak);.
+    - **Downtime**: không gián đoạn dịch vụ **không kế hoạch** trong cửa sổ mở đăng ký cao điểm; mục tiêu **≥ 99,9% uptime** trong tuần diễn ra sự kiện.
+  - **Cô lập sự cố thanh toán**: Khi cổng thanh toán lỗi kéo dài, các tính năng không liên quan (xem lịch, xem thông tin workshop, workshop miễn phí…) vẫn phải hoạt động bình thường.
 
 ---
 
@@ -55,7 +54,6 @@ Xây dựng hệ thống UniHub Workshop số hóa toàn bộ quy trình từ đ
 | **Ban tổ chức**      | Dùng web admin để tạo / cập nhật / đổi phòng / đổi giờ / hủy workshop; xem thống kê đăng ký; upload PDF để hệ thống tự sinh AI summary                                | Kiểm soát truy cập chặt chẽ vào trang admin; thao tác đơn giản, ít sai sót; quan sát được tình trạng sự kiện |
 | **Nhân sự check-in** | Dùng mobile app để quét mã QR sinh viên tại cửa phòng; ghi nhận check-in kể cả khi mất mạng                                                                           | App không dừng hoạt động khi mất mạng; dữ liệu không mất và tự đồng bộ khi có mạng trở lại                   |
 
-
 ---
 
 ## 5. Phạm vi
@@ -63,24 +61,24 @@ Xây dựng hệ thống UniHub Workshop số hóa toàn bộ quy trình từ đ
 ### 5.1. Thuộc phạm vi đồ án
 
 - **Interfaces**:
-	- **Web app cho sinh viên**: xem lịch workshop, đăng ký, xem mã QR, nhận thông báo.
-	- **Web admin cho ban tổ chức**: quản lý workshop (CRUD, đổi phòng, đổi giờ, hủy), xem thống kê đăng ký, upload PDF để tạo AI summary.
-	- **Mobile app cho nhân sự check-in**: quét QR, check-in offline với hàng đợi local + đồng bộ khi có mạng.
+  - **Web app cho sinh viên**: xem lịch workshop, đăng ký, xem mã QR, nhận thông báo.
+  - **Web admin cho ban tổ chức**: quản lý workshop (CRUD, đổi phòng, đổi giờ, hủy), xem thống kê đăng ký, upload PDF để tạo AI summary.
+  - **Mobile app cho nhân sự check-in**: quét QR, check-in offline với hàng đợi local + đồng bộ khi có mạng.
 - **Backend API**: xử lý đăng ký, quản lý chỗ ngồi, tích hợp thanh toán, phát hành mã QR, điều phối thông báo, phục vụ các client web/mobile.
-	- **Pipeline nhập dữ liệu CSV** hằng đêm từ hệ thống quản lý sinh viên cũ: validate, dedupe, idempotent upsert, alert khi file lỗi.
-	- **Pipeline AI Summary:** nhận PDF từ admin → trích xuất văn bản → làm sạch → gọi AI model → lưu và hiển thị.
-	- **Hệ thống thông báo mở rộng được**: triển khai app + email; thiết kế theo hướng dễ bổ sung kênh mới (Telegram…) mà không cần sửa lõi.
+  - **Pipeline nhập dữ liệu CSV** hằng đêm từ hệ thống quản lý sinh viên cũ: validate, dedupe, idempotent upsert, alert khi file lỗi.
+  - **Pipeline AI Summary:** nhận PDF từ admin → trích xuất văn bản → làm sạch → gọi AI model → lưu và hiển thị.
+  - **Hệ thống thông báo mở rộng được**: triển khai app + email; thiết kế theo hướng dễ bổ sung kênh mới (Telegram…) mà không cần sửa lõi.
 - **Cơ chế kiểm soát truy cập** (RBAC): phân quyền 3 nhóm người dùng, kiểm tra tại API endpoint, web admin và mobile app.
 - **Các cơ chế bảo vệ hệ thống**: Rate limiting (chống tải đột biến), Circuit Breaker + Graceful Degradation (cô lập lỗi payment gateway), Idempotency Key (chống trừ tiền hai lần).
 
 ### 5.2. Không thuộc phạm vi đồ án
 
-- **Payment gateway thật** — sẽ sử dụng mock / stub có thể điều khiển các kịch bản lỗi (timeout, lỗi kéo dài) để minh hoạ Circuit Breaker và Idempotency.
+- **Latency network**
+- **Payment gateway thật**: sẽ sử dụng mock / stub có thể điều khiển các kịch bản lỗi (timeout, lỗi kéo dài) để minh hoạ Circuit Breaker và Idempotency.
 - **Triển khai hạ tầng production thực tế** (cloud provisioning, CI/CD pipeline đầy đủ, monitoring stack).
-- **Hệ thống quản lý sinh viên gốc của trường** — chỉ đọc CSV export, **không** chỉnh sửa hay tích hợp ngược.
-- **Native mobile app đầy đủ tính năng cho sinh viên** — sinh viên dùng web app responsive; mobile app chỉ phục vụ nhân sự check-in.
-- **Huấn luyện AI model riêng** — chỉ tích hợp mô hình AI có sẵn qua API để sinh summary.
-
+- **Hệ thống quản lý sinh viên gốc của trường**: chỉ đọc CSV export, **không** chỉnh sửa hay tích hợp ngược.
+- **Native mobile app đầy đủ tính năng cho các roles**: sinh viên dùng web app responsive; mobile app nhân sự chỉ phục vụ check-in.
+- **Huấn luyện AI model**: chỉ tích hợp mô hình AI có sẵn qua API để sinh summary.
 
 ---
 
@@ -89,11 +87,9 @@ Xây dựng hệ thống UniHub Workshop số hóa toàn bộ quy trình từ đ
 | Rủi ro / Ràng buộc           | Mô tả                                                                                                                                                                    | Hướng xử lý                                                                                                                                                                |
 | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Tranh chấp chỗ ngồi**      | Một số workshop chỉ có 60 chỗ nhưng hàng trăm sinh viên cố đăng ký cùng lúc. Cần đảm bảo tính nhất quán tuyệt đối: không hai sinh viên nào cùng nhận được chỗ cuối cùng. | Atomic decrement / pessimistic lock trên số chỗ còn lại; reservation timeout để giải phóng chỗ nếu chưa thanh toán trong thời hạn.                                         |
-| **Tải đột biến**             | ~12.000 sinh viên truy cập trong 10 phút đầu, 60% dồn vào 3 phút đầu tiên. Backend API và database có nguy cơ quá tải, cần đảm bảo công bằng giữa các client.            | Rate Limiting (Token Bucket / Sliding Window) ở biên; queue-based registration khi vượt ngưỡng; horizontal scaling cho API.                                                |
+| **Tải đột biến**             | Không downtime không kế hoạch. Đảm bảo công bằng. Tránh spam.                                                                                                            | Rate Limiting (Token Bucket / Sliding Window) ở biên; queue-based registration khi vượt ngưỡng; horizontal scaling cho API.                                                |
 | **Thanh toán không ổn định** | Cổng thanh toán có thể timeout hoặc lỗi kéo dài. Rủi ro trừ tiền hai lần nếu client retry; rủi ro kéo sập toàn bộ dịch vụ nếu không cô lập.                              | Circuit Breaker (Closed / Open / Half-Open) + Graceful Degradation; Idempotency Key cho mỗi giao dịch (sinh ở client, lưu server, có TTL).                                 |
 | **Check-in offline**         | Một số khu vực trong trường mất kết nối. Nhân sự không thể dừng check-in, và dữ liệu không được mất khi kết nối trở lại.                                                 | Mobile app lưu check-in vào local storage (hàng đợi outbox); background sync tự động khi có mạng; chống trùng theo `(student_id, workshop_id)` + timestamp.                |
 | **Tích hợp một chiều CSV**   | Hệ thống quản lý sinh viên cũ không có API; chỉ export CSV theo lịch cố định hằng đêm. File có thể lỗi định dạng, trùng dữ liệu hoặc thiếu cột.                          | Scheduled import job ngoài giờ cao điểm, có validation + deduplication + idempotent upsert; quarantine file lỗi và alert cho admin; không làm gián đoạn service đang chạy. |
 | **Phân quyền 3 nhóm**        | Sinh viên / Ban tổ chức / Nhân sự check-in có phạm vi quyền khác nhau. Sai sót phân quyền có thể khiến sinh viên truy cập trang admin hoặc ngược lại.                    | RBAC với role được gắn vào token; kiểm tra tập trung ở API gateway / middleware; kiểm tra bổ sung ở client cho UX, nhưng quyết định cuối cùng luôn ở server.               |
 | **Phụ thuộc AI model ngoài** | Dịch vụ AI có thể chậm hoặc lỗi, không được làm ảnh hưởng tới luồng đăng ký / check-in chính.                                                                            | Xử lý AI Summary **bất đồng bộ** qua message queue; hiển thị trạng thái "đang xử lý" / "chưa có summary"; retry có giới hạn khi lỗi.                                       |
-
-

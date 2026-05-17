@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { CalendarDays, ScanLine, ShieldCheck } from 'lucide-react';
+import { CalendarDays, ScanLine } from 'lucide-react';
 import { buttonVariants } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@unihub/format/cn';
@@ -13,15 +13,9 @@ const features = [
   },
   {
     icon: ScanLine,
-    title: 'Mã QR check-in',
-    desc: 'Sau khi đăng ký, nhận mã QR cá nhân để check-in.',
+    title: 'Đăng ký và check-in',
+    desc: 'Đăng ký và check-in workshop một cách dễ dàng và nhanh chóng.',
     to: '/me/registrations',
-  },
-  {
-    icon: ShieldCheck,
-    title: 'Thanh toán',
-    desc: 'Thanh toán trực tiếp qua hệ thống thanh toán của trường.',
-    to: '/workshops',
   },
 ] as const;
 

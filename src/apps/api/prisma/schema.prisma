@@ -101,8 +101,35 @@ model Registration {
   createdAt   DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt   DateTime           @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  user     User     @relation(fields: [userId], references: [id], onDelete: Restrict)
-  workshop Workshop @relation(fields: [workshopId], references: [id], onDelete: Restrict)
+  user     User      @relation(fields: [userId], references: [id], onDelete: Restrict)
+  workshop Workshop  @relation(fields: [workshopId], references: [id], onDelete: Restrict)
+  payment  Payment?
 
   @@map("registrations")
+}
+
+enum PaymentStatus {
+  pending
+  succeeded
+  failed
+  refunded
+
+  @@map("payment_status")
+}
+
+model Payment {
+  id             String        @id @default(uuid()) @db.Uuid
+  registrationId String        @unique @map("registration_id") @db.Uuid
+  idempotencyKey String        @unique @map("idempotency_key") @db.VarChar(191)
+  providerTxnId  String?       @map("provider_txn_id")
+  amount         Decimal       @db.Decimal(14, 2)
+  status         PaymentStatus @default(pending)
+  attemptCount   Int           @default(0) @map("attempt_count")
+  lastError      String?       @map("last_error")
+  createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  registration Registration @relation(fields: [registrationId], references: [id], onDelete: Restrict)
+
+  @@map("payments")
 }

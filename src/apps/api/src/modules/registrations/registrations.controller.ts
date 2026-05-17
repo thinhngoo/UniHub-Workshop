@@ -3,6 +3,7 @@ import {
   Body,
   Controller,
   Get,
+  Headers,
   HttpCode,
   HttpStatus,
   Param,
@@ -13,6 +14,7 @@ import {
 } from '@nestjs/common';
 import type {
   CreateRegistrationResponse,
+  Payment,
   Registration,
   User,
 } from '@unihub/types';
@@ -20,6 +22,7 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { AuthGuard } from '../auth/guards/auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
+import { PaymentsService } from '../payments/payments.service';
 import { CreateRegistrationDto } from './dto/create-registration.dto';
 import { RegistrationsService } from './registrations.service';
 
@@ -41,7 +44,10 @@ const registrationBodyValidationPipe = new ValidationPipe({
 @Controller('registrations')
 @UseGuards(AuthGuard)
 export class RegistrationsController {
-  constructor(private readonly registrations: RegistrationsService) {}
+  constructor(
+    private readonly registrations: RegistrationsService,
+    private readonly payments: PaymentsService,
+  ) {}
 
   @Get('me')
   async listMine(@CurrentUser() user: User): Promise<Registration[]> {
@@ -56,8 +62,20 @@ export class RegistrationsController {
   async create(
     @CurrentUser() user: User,
     @Body() body: CreateRegistrationDto,
+    @Headers('idempotency-key') idempotencyKey?: string,
   ): Promise<CreateRegistrationResponse> {
-    return this.registrations.create(user.id, body.workshopId);
+    return this.registrations.create(user.id, body.workshopId, idempotencyKey);
+  }
+
+  @Get(':id/payment')
+  async getRegistrationPayment(
+    @CurrentUser() user: User,
+    @Param('id') registrationId: string,
+  ): Promise<Payment> {
+    return this.payments.getPaymentForRegistrationOwned(
+      user.id,
+      registrationId,
+    );
   }
 
   @Get(':id/qr')

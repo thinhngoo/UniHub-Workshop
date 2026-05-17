@@ -2,6 +2,7 @@ import type { AxiosInstance } from 'axios';
 import type {
   CreateRegistrationRequest,
   CreateRegistrationResponse,
+  Payment,
   Registration,
   UUID,
 } from '@unihub/types';
@@ -18,6 +19,8 @@ export const registrationsApi = (http: AxiosInstance) => ({
       .then((r) => r.data),
   cancel: (id: UUID) =>
     http.post<Registration>(`/registrations/${id}/cancel`).then((r) => r.data),
+  getPaymentForRegistration: (registrationId: UUID) =>
+    http.get<Payment>(`/registrations/${registrationId}/payment`).then((r) => r.data),
   getQr: (id: UUID) =>
     http
       .get<{ qrToken: string; qrImageUrl: string }>(`/registrations/${id}/qr`)
