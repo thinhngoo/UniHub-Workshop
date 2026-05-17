@@ -1,6 +1,5 @@
 import { Link } from 'react-router-dom';
-import { CalendarDays, ScanLine } from 'lucide-react';
-import { buttonVariants } from '@/components/ui/button';
+import { Bell, CalendarDays, ScanLine, User } from 'lucide-react';import { buttonVariants } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@unihub/format/cn';
 
@@ -12,10 +11,22 @@ const features = [
     to: '/workshops',
   },
   {
+    icon: User,
+    title: 'Tài khoản',
+    desc: 'Thông tin tài khoản công khai.',
+    to: '/me',
+  },
+  {
     icon: ScanLine,
     title: 'Đăng ký và check-in',
     desc: 'Đăng ký và check-in workshop một cách dễ dàng và nhanh chóng.',
     to: '/me/registrations',
+  },
+  {
+    icon: Bell,
+    title: 'Thông báo',
+    desc: 'Đăng ký, thanh toán và các cập nhật của bạn.',
+    to: '/me/notifications',
   },
 ] as const;
 

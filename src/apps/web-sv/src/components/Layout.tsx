@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { CalendarDays, LogIn, LogOut, Menu, Ticket, User as UserIcon } from 'lucide-react';
+import { CalendarDays, LogIn, LogOut, Bell, Menu, Ticket, User as UserIcon } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
@@ -84,13 +84,17 @@ function Header() {
                   className="absolute right-0 top-full z-50 mt-2 w-56 rounded-xl border border-slate-200 bg-white py-2 px-1 shadow-lg"
                   role="menu"
                 >
-                  <NavLink to="/workshops" className={menuNavItem} role="menuitem">
+                  <NavLink to="/me" className={menuNavItem} role="menuitem">
                     <UserIcon className="size-4 shrink-0" />
                     Tài khoản
                   </NavLink>
                   <NavLink to="/workshops" className={menuNavItem} role="menuitem">
                     <CalendarDays className="size-4 shrink-0" />
                     Lịch workshop
+                  </NavLink>
+                  <NavLink to="/me/notifications" className={menuNavItem} role="menuitem">
+                    <Bell className="size-4 shrink-0" />
+                    Thông báo
                   </NavLink>
                   <NavLink to="/me/registrations" className={menuNavItem} role="menuitem">
                     <Ticket className="size-4 shrink-0" />

@@ -1,4 +1,4 @@
-import { createBrowserRouter, Navigate } from 'react-router-dom';
+import { createBrowserRouter } from 'react-router-dom';
 import { Layout } from '@/components/Layout';
 import { RequireAuth } from '@/components/RequireAuth';
 import { HomePage } from '@/pages/HomePage';
@@ -8,6 +8,8 @@ import { WorkshopDetailPage } from '@/pages/WorkshopDetailPage';
 import { MyRegistrationsPage } from '@/pages/MyRegistrationsPage';
 import { RegistrationPaymentPage } from '@/pages/RegistrationPaymentPage';
 import { QrPage } from '@/pages/QrPage';
+import { NotificationsPage } from '@/pages/NotificationsPage';
+import { MePage } from '@/pages/MePage';
 import { NotFoundPage } from '@/pages/NotFoundPage';
 
 export const router = createBrowserRouter([
@@ -23,7 +25,7 @@ export const router = createBrowserRouter([
         path: 'me',
         element: (
           <RequireAuth>
-            <Navigate to="/me/registrations" replace />
+            <MePage />
           </RequireAuth>
         ),
       },
@@ -32,6 +34,14 @@ export const router = createBrowserRouter([
         element: (
           <RequireAuth>
             <MyRegistrationsPage />
+          </RequireAuth>
+        ),
+      },
+      {
+        path: 'me/notifications',
+        element: (
+          <RequireAuth>
+            <NotificationsPage />
           </RequireAuth>
         ),
       },
