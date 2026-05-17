@@ -160,4 +160,56 @@ export class WorkshopsRepository {
       throw e;
     }
   }
+
+  async markSummaryPending(id: string): Promise<DomainWorkshop | null> {
+    try {
+      const row = await this.prisma.workshop.update({
+        where: { id },
+        data: {
+          summary: null,
+          summaryStatus: 'pending',
+          version: { increment: 1 },
+        },
+      });
+      return this.toDomain(row);
+    } catch (e: unknown) {
+      if (
+        typeof e === 'object' &&
+        e !== null &&
+        'code' in e &&
+        (e as { code: string }).code === 'P2025'
+      ) {
+        return null;
+      }
+      throw e;
+    }
+  }
+
+  async applySummaryFromPdfText(
+    id: string,
+    summaryText: string,
+    summaryStatus: 'ready' | 'failed',
+  ): Promise<DomainWorkshop | null> {
+    try {
+      const row = await this.prisma.workshop.update({
+        where: { id },
+        data: {
+          summary: summaryStatus === 'ready' ? summaryText : null,
+          summaryStatus,
+          version: { increment: 1 },
+        },
+      });
+      return this.toDomain(row);
+    } catch (e: unknown) {
+      if (
+        typeof e === 'object' &&
+        e !== null &&
+        'code' in e &&
+        (e as { code: string }).code === 'P2025'
+      ) {
+        return null;
+      }
+      throw e;
+    }
+  }
 }

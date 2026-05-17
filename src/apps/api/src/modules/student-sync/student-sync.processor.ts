@@ -4,7 +4,7 @@ import type { StudentSyncReport } from '@unihub/types';
 import { Job } from 'bullmq';
 import { STUDENT_SYNC_QUEUE } from '../../constant';
 import { StudentSyncService } from './student-sync.service';
-import type { StudentSyncJobPayload } from './student-sync.types';
+import type { StudentSyncJobPayload } from './student-sync';
 
 @Processor(STUDENT_SYNC_QUEUE)
 export class StudentSyncProcessor extends WorkerHost {

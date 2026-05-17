@@ -154,7 +154,9 @@ export class WorkshopsService {
     if (dto.room !== undefined) data.room = dto.room.trim();
     if (dto.roomMapUrl !== undefined) {
       data.roomMapUrl =
-        dto.roomMapUrl.trim() === '' ? null : dto.roomMapUrl.trim();
+        dto.roomMapUrl === null || dto.roomMapUrl.trim() === ''
+          ? null
+          : dto.roomMapUrl.trim();
     }
     if (dto.startsAt !== undefined) data.startsAt = new Date(dto.startsAt);
     if (dto.endsAt !== undefined) data.endsAt = new Date(dto.endsAt);
@@ -172,9 +174,10 @@ export class WorkshopsService {
 
     if (dto.status !== undefined) data.status = dto.status;
     if (dto.summary !== undefined) {
-      data.summary = dto.summary.trim() === '' ? null : dto.summary;
-    }
-    if (dto.summaryStatus !== undefined) {
+      const cleared = dto.summary === null || dto.summary.trim() === '';
+      data.summary = cleared ? null : dto.summary.trim();
+      data.summaryStatus = cleared ? 'none' : 'ready';
+    } else if (dto.summaryStatus !== undefined) {
       data.summaryStatus = dto.summaryStatus;
     }
 

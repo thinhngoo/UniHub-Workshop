@@ -25,7 +25,7 @@ import {
   STUDENT_SYNC_MAX_FILE_BYTES,
   STUDENT_SYNC_QUEUE,
 } from '../../constant';
-import type { StudentSyncJobPayload } from './student-sync.types';
+import type { StudentSyncJobPayload } from './student-sync';
 
 /** Fields used from Multer's uploaded file (memory storage). */
 interface UploadedCsvFile {
