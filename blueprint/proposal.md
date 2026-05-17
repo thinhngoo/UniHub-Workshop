@@ -48,11 +48,11 @@ Xây dựng hệ thống UniHub Workshop số hóa toàn bộ quy trình từ đ
 ## 4. Người dùng và nhu cầu
 
 
-| Nhóm                 | Nhu cầu chính                                                                                              | Điều quan trọng nhất                                                                       |
-| -------------------- | ---------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| **Sinh viên**        | Xem danh sách workshop (diễn giả, phòng, sơ đồ phòng, số chỗ còn lại); đăng ký; nhận mã QR; nhận thông báo | Đăng ký nhanh, không mất chỗ / mất tiền oan; số chỗ hiển thị chính xác theo thời gian thực |
-| **Ban tổ chức**      | Dùng web admin để tạo / cập nhật / đổi phòng / đổi giờ / hủy workshop; xem thống kê đăng ký; upload PDF    | Kiểm soát truy cập; thao tác đơn giản, ít sai sót; quan sát được tình trạng sự kiện        |
-| **Nhân sự check-in** | Dùng mobile app để quét mã QR sinh viên; ghi nhận check-in kể cả khi mất mạng                              | App không dừng hoạt động khi mất mạng; dữ liệu không mất và tự đồng bộ khi có mạng trở lại |
+| Nhóm                 | Nhu cầu chính                                                                                               | Điều quan trọng nhất                                                                        |
+| -------------------- | ----------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| **Sinh viên**        | Xem danh sách workshop (diễn giả, phòng, sơ đồ phòng, số chỗ còn lại); đăng ký; nhận mã QR; nhận thông báo. | Đăng ký nhanh, không mất chỗ / mất tiền oan; số chỗ hiển thị chính xác theo thời gian thực. |
+| **Ban tổ chức**      | Dùng web admin để tạo / cập nhật / đổi phòng / đổi giờ / hủy workshop; xem thống kê đăng ký; upload PDF.    | Kiểm soát các tài nguyên; thao tác đơn giản, ít sai sót; quan sát được tình trạng sự kiện.  |
+| **Nhân sự check-in** | Dùng mobile app để quét mã QR sinh viên; ghi nhận check-in kể cả khi mất mạng.                              | App không dừng hoạt động khi mất mạng; dữ liệu không mất và đồng bộ khi có mạng trở lại.    |
 
 
 ---
@@ -76,8 +76,8 @@ Xây dựng hệ thống UniHub Workshop số hóa toàn bộ quy trình từ đ
 
 - **Latency network**: không đảm bảo độ trễ tối thiểu, miễn là chịu tải được và không quá khó chịu cho UX.
 - **Payment gateway thật**: sẽ sử dụng mock / stub có thể điều khiển các kịch bản lỗi (timeout, lỗi kéo dài) để minh hoạ Circuit Breaker và Idempotency.
-- **Triển khai hạ tầng production thực tế** (cloud provisioning, CI/CD pipeline đầy đủ, audit log, monitoring stack).
-- **Hệ thống quản lý sinh viên gốc của trường**: chỉ đọc CSV export, **không** chỉnh sửa hay tích hợp ngược.
+- **Triển khai hạ tầng production thực tế** (CI/CD pipeline, audit log, monitoring stack...).
+- **Hệ thống quản lý sinh viên gốc của trường**: chỉ nhận được CSV.
 - **Native mobile app đầy đủ tính năng cho các roles**: sinh viên dùng web app responsive; mobile app nhân sự chỉ phục vụ check-in.
 - **Huấn luyện AI model**: chỉ tích hợp mô hình AI có sẵn qua API để sinh summary.
 

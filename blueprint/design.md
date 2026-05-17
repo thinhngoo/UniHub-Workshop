@@ -1,24 +1,75 @@
 # UniHub Workshop — Technical Design
 
-## Kiến trúc tổng thể
+## 1. Kiến trúc tổng thể
 
-### Phong cách kiến trúc
+### 1.1. Phong cách kiến trúc
 
 **Modular Monolith cho Backend API** kết hợp với 3 hệ **client tách biệt** (Web SV, Web Admin, Mobile Staff) và một số **worker chạy nền** cho các tác vụ bất đồng bộ. Microservices ở backend tạo overhead vận hành. Monolith cho phép các module centralized và refactor dễ dàng; sẽ cân nhắc tách khi mục tiêu nghiệp vụ đủ lớn và phức tạp.
 
-| Module         | Chức năng chính                                                    |
-| -------------- | ------------------------------------------------------------------ |
-| `auth`         | Xác thực, kiểm tra role (RBAC)                                     |
-| `workshop`     | CRUD workshop, quản lý số chỗ, ai summary                          |
-| `registration` | Giữ chỗ (reservation), xác nhận, phát hành mã QR                   |
-| `payment`      | Khởi tạo giao dịch, idempotency, circuit breaker                   |
-| `checkin`      | Nhận sự kiện check-in, chống trùng                                 |
-| `notification` | Điều phối gửi thông báo qua nhiều kênh (app, email, …), dễ mở rộng |
-| `student-sync` | Import CSV hằng đêm từ hệ thống sinh viên cũ                       |
+**Hàng đợi (BullMQ trên Redis)**: chỉ ba module là **consumer** có đăng ký queue + `@Processor`; module **registration** và **payment** chỉ **enqueue** job vào queue `notifications`, không có queue riêng.
 
-### C4 Diagram
+| Module         | Chức năng chính                                                    | Queue (BullMQ)                                                                    |
+| -------------- | ------------------------------------------------------------------ | --------------------------------------------------------------------------------- |
+| `auth`         | Xác thực, kiểm tra role (RBAC)                                     | —                                                                                 |
+| `workshop`     | CRUD workshop, quản lý số chỗ, ai summary                          | **Consumer** queue `workshop-summary` — job tóm tắt nội dung workshop (PDF → AI). |
+| `registration` | Giữ chỗ (reservation), xác nhận, phát hành mã QR                   | **Producer** enqueue → queue `notifications` (đăng ký miễn phí thành công).       |
+| `payment`      | Khởi tạo giao dịch, idempotency, circuit breaker                   | **Producer** enqueue → queue `notifications` (thanh toán thành công).             |
+| `checkin`      | Nhận sự kiện check-in, chống trùng                                 | —                                                                                 |
+| `notification` | Điều phối gửi thông báo qua nhiều kênh (app, email, …), dễ mở rộng | **Consumer** queue `notifications` — dispatch.                                    |
+| `student-sync` | Import CSV hằng đêm từ hệ thống sinh viên cũ                       | **Consumer** queue `student-sync` — job xử lý file CSV đã nhập.                   |
 
-#### Level 1 — System Context
+### 1.2. Tương tác
+
+Các module nghiệp vụ trong **Monolith** giao tiếp qua **inject service** (NestJS), không gọi HTTP nội bộ.
+
+**Tổng quan**:
+
+- Đăng ký workshop: cần `workshop` (đọc/khóa chỗ) và `payment` (giữ chỗ có phí).
+- Thông báo: khi hoàn tất đăng ký thì `registration` hoặc `payment` enqueue job cho `notification`.
+- Checkin xác nhận: cần `registration`.
+- Nhập CSV: `student-sync` chỉ đồng bộ qua database.
+- Xác thực & Phân quyền: `auth` cung cấp JWT/session và guard RBAC cho controller của các module còn lại.
+
+```mermaid
+flowchart TB
+  subgraph Domain["Module nghiệp vụ"]
+    auth_mod["auth"]
+    workshop_mod["workshop"]
+    registration_mod["registration"]
+    payment_mod["payment"]
+    checkin_mod["checkin"]
+    notification_mod["notification"]
+    student_sync_mod["student-sync"]
+  end
+
+  DA["Data access<br/>PostgreSQL · Redis · BullMQ"]
+
+  registration_mod -->|"đọc workshop, capacity"| workshop_mod
+  registration_mod -->|"intent / webhook"| payment_mod
+  registration_mod -->|"enqueue (đăng ký)"| notification_mod
+  payment_mod -->|"enqueue (thanh toán OK)"| notification_mod
+  checkin_mod -->|"theo QR / đăng ký"| registration_mod
+
+  Domain --> DA
+```
+
+_(HTTP: controller các module dùng **auth** (`AuthGuard`, `RolesGuard`) — không vẽ nét để tránh chồng chéo.)_
+
+_(Ngoài ra, module `admin` đọc tổng hợp từ **workshop** và **registration** cho dashboard)_
+
+**Khi gặp sự cố**:
+
+| Điểm lỗi                                                                                        | Trực tiếp                                                                                                                                                                                                                                                                                              | Nhận xét                                                           |
+| ----------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------ |
+| **Tiến trình API Monolith** (crash, panic, leak bộ nhớ…)                                        | Toàn bộ HTTP API và worker cùng `node`/container **đều downtime** cho đến khi orchestrator khởi động lại. Không có cô lập theo module trong một process.                                                                                                                                               | SPOF, cân nhắc deploy 2 process để an toàn (2 API + 1 queue).      |
+| **PostgreSQL**                                                                                  | **Hầu hết luồng nghiệp vụ đồng bộ**: workshop, đăng ký, thanh toán (ghi DB), checkin, đồng bộ danh mục user, refresh/me đọc user… đều lỗi hoặc timeout.                                                                                                                                                | SPOF, cân nhắc dùng database phụ.                                  |
+| **Redis**                                                                                       | **Session đăng nhập** (`SessionStore`): web admin / nhân sự dùng session **không xác thực / không duy trì phiên** cho đến khi Redis hồi phục. **BullMQ**: không enqueue/consumer được — job `workshop-summary`, `notifications`, `student-sync` **đứng hàng đợi hoặc thất bại**, không có worker chạy. | Không quan trọng bằng SPOF nhưng ảnh hưởng đến phần lớn chức năng. |
+| **Consumer queue / job lẻ** (e.g., worker `notification`, `workshop-summary` chậm hoặc ném lỗi) | Thông báo chậm/thất bại có retry theo Bull; tóm tắt AI chậm/ghi `failed`.                                                                                                                                                                                                                              | Các chức năng lõi của hệ thống vẫn hoạt động tốt.                  |
+| **Payment Gateway / AI bên thứ ba**                                                             | Thanh toán không khởi tạo/confirm được; không tóm tắt PDF được cho workshop đó.                                                                                                                                                                                                                        |                                                                    |
+
+## 2. C4 Diagram
+
+### 2.1. Level 1 — System Context
 
 ```mermaid
 flowchart TB
@@ -45,13 +96,169 @@ flowchart TB
     Core -- Gửi thông báo --> NOTI
 ```
 
+### 2.2. Level 2 — Container
+
+```mermaid
+flowchart LR
+    SV([Sinh viên])
+    BTC([Ban tổ chức])
+    NSC([Nhân sự check-in])
+
+    subgraph Clients
+        WebSV["Web App — Sinh viên<br/>React + Vite + TypeScript"]
+        WebAdmin["Web Admin — Ban tổ chức<br/>React + Vite + TypeScript"]
+        Mobile["Mobile App — Nhân sự<br/>React Native + SQLite"]
+    end
+
+    LB["API Gateway / Load Balancer<br/>+ Rate Limiter<br/>Nginx / Traefik + Redis"]
+
+    subgraph Backend
+        API["Monolith Backend API<br/>NestJS"]
+        Worker["Async Worker(s)"]
+        MQ[("Message Broker<br/>BullMQ on Redis")]
+    end
+
+    SQL[("Relational DB<br/>PostgreSQL + Prisma")]
+    Cache[("In-memory Store<br/>Redis")]
+
+    PG[(Payment Gateway)]
+    AI[(AI Provider)]
+    SIS[(Student Info System<br/>CSV export)]
+    MAIL[(Email Provider)]
+
+    SV --> WebSV
+    BTC --> WebAdmin
+    NSC --> Mobile
+
+    WebSV -- HTTPS/JSON --> LB
+    WebAdmin -- HTTPS/JSON --> LB
+    Mobile -- HTTPS/JSON<br/>(batch sync khi online) --> LB
+
+    LB --> API
+
+    API --> SQL
+    API --> Cache
+    API -- queue --> MQ
+    API -- HTTP --> PG
+    PG -- webhook --> LB
+
+    MQ --> Worker
+    Worker --> SQL
+    Worker -- HTTP --> AI
+    Worker -- SMTP/API --> MAIL
+
+    SIS -- CSV --> LB
+```
+
+---
+
+## Cơ sở dữ liệu
+
+### Lựa chọn loại database
+
+Dùng **Relational DB (SQL)** làm kho dữ liệu chính, kết hợp với **key-value store** cho dữ liệu tạm thời.
+
+| Loại dữ liệu                                                              | Storage            | Lý do                                                                                         |
+| ------------------------------------------------------------------------- | ------------------ | --------------------------------------------------------------------------------------------- |
+| User, Workshop, Registration, Payment, Check-in, Notification             | **Relational DB**  | Cần ACID cho nghiệp vụ giữ chỗ và thanh toán; quan hệ giữa các entity rõ ràng; query thống kê |
+| Rate-limit counter, Idempotency key, Circuit breaker state, Session cache | **KV / in-memory** | Truy cập nhiều, TTL ngắn, không cần bền vững tuyệt đối                                        |
+
+### Sơ đồ quan hệ (ER)
+
+```mermaid
+erDiagram
+    USERS ||--o{ REGISTRATIONS : "user_id"
+    WORKSHOPS ||--o{ REGISTRATIONS : "workshop_id"
+    REGISTRATIONS ||--o| PAYMENTS : "registration_id UNIQUE"
+    REGISTRATIONS ||--o| CHECKINS : "registration_id UNIQUE"
+    USERS ||--o{ CHECKINS : "staff_user_id"
+    USERS ||--o{ NOTIFICATIONS : "user_id"
+
+    USERS {
+        uuid id PK
+        varchar student_code "NULL, partial UNIQUE"
+        varchar email "NOT NULL, UNIQUE lower"
+        text password
+        text full_name
+        role_code role
+        user_status status
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    WORKSHOPS {
+        uuid id PK
+        text title
+        text speaker
+        text room
+        text room_map_url "NULL"
+        timestamptz starts_at
+        timestamptz ends_at
+        int capacity
+        int seats_left
+        boolean is_paid
+        numeric price "NULL"
+        workshop_status status
+        text summary "NULL"
+        summary_status summary_status
+        int version
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    REGISTRATIONS {
+        uuid id PK
+        uuid user_id FK
+        uuid workshop_id FK
+        registration_status status
+        timestamptz reserved_at
+        timestamptz expires_at "NULL"
+        timestamptz confirmed_at "NULL"
+        text qr_token "NULL, partial UNIQUE"
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    PAYMENTS {
+        uuid id PK
+        uuid registration_id FK "UNIQUE 1-1"
+        varchar idempotency_key "UNIQUE"
+        text provider_txn_id "NULL"
+        numeric amount
+        payment_status status
+        int attempt_count
+        text last_error "NULL"
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    CHECKINS {
+        uuid id PK
+        uuid registration_id FK "UNIQUE"
+        uuid client_event_id
+        timestamptz scanned_at
+        timestamptz received_at
+        uuid staff_user_id FK
+    }
+
+    NOTIFICATIONS {
+        uuid id PK
+        uuid user_id FK
+        varchar template_code
+        jsonb payload_json
+        notification_status status
+        timestamptz created_at
+        timestamptz sent_at "NULL"
+    }
+```
+
 ---
 
 ## Bảo mật
 
 ### Xác thực (authentication)
 
-Backend dùng **`AuthGuard`**: đọc **Bearer JWT** (`Authorization`) hoặc **session id** (cookie/header tùy cấu hình extract), gọi `AuthService.me`, rồi gắn `req.user` (kèm `role`) cho request hiện tại. Thất bại → **401** (`unauthenticated`).
+Backend dùng `**AuthGuard**`: đọc **Bearer JWT** (`Authorization`) hoặc **session id** (cookie/header tùy cấu hình extract), gọi `AuthService.me`, rồi gắn `req.user` (kèm `role`) cho request hiện tại. Thất bại → **401** (`unauthenticated`).
 
 Triển khai client:
 
@@ -62,11 +269,11 @@ Triển khai client:
 
 **Triển khai tại API**, UX hỗ trợ hiển thị.
 
-| Thành phần       | Vai trò                                                                                                                          |
-| ---------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| **`RolesGuard`** | Đọc metadata `@Roles(...)` trên handler hoặc class (`Reflector`); nếu route **không** khai báo role thì không chặn theo vai trò. |
-| **`@Roles`**     | Liệt kê một hoặc nhiều `RoleCode` được phép (`'student' \| 'organizer' \| 'staff' \| 'admin'`).                                  |
-| Chuỗi guard      | Route cần phân quyền đặt `@UseGuards(AuthGuard, RolesGuard)` — **luôn cần** `AuthGuard` trước để có `req.user`.                  |
+| Thành phần     | Vai trò                                                                                                                          |
+| -------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `**RolesGuard` | Đọc metadata `@Roles(...)` trên handler hoặc class (`Reflector`); nếu route **không** khai báo role thì không chặn theo vai trò. |
+| `**@Roles`     | Liệt kê một hoặc nhiều `RoleCode` được phép (`'student'                                                                          |
+| Chuỗi guard    | Route cần phân quyền đặt `@UseGuards(AuthGuard, RolesGuard)` — **luôn cần** `AuthGuard` trước để có `req.user`.                  |
 
 Luồng trong `RolesGuard`:
 
@@ -79,75 +286,9 @@ Luồng trong `RolesGuard`:
 | Role        | Permission (ý định)                                                                                                             |
 | ----------- | ------------------------------------------------------------------------------------------------------------------------------- |
 | `student`   | `workshop:read`, `registration:create(self)`, `registration:read(self)`, `registration:cancel(self)`, `notification:read(self)` |
-| `organizer` | `workshop:*`, `registration:read(any)`                                                                                          |
+| `organizer` | `workshop:`, `registration:read(any)`                                                                                           |
 | `staff`     | `checkin:create`, `checkin:batch_sync`, `registration:read(byqr)`                                                               |
 | `admin`     | Toàn quyền trên các route được bảo vệ bằng role (và các route chỉ `@Roles('admin')` như nhập CSV).                              |
-
----
-
-## Cơ sở dữ liệu
-
-### Lựa chọn loại database
-
-Dùng **Relational DB (SQL)** làm kho dữ liệu chính, kết hợp với **key-value store** cho dữ liệu tạm thời.
-
-| Loại dữ liệu                                                              | Storage            | Lý do                                                                                         |
-| ------------------------------------------------------------------------- | ------------------ | --------------------------------------------------------------------------------------------- |
-| User, Role, Workshop, Registration, Payment, CheckIn                      | **Relational DB**  | Cần ACID cho nghiệp vụ giữ chỗ và thanh toán; quan hệ giữa các entity rõ ràng; query thống kê |
-| Rate-limit counter, Idempotency key, Circuit breaker state, Session cache | **KV / in-memory** | Truy cập nhiều, TTL ngắn, không cần bền vững tuyệt đối                                        |
-
-### Sơ đồ quan hệ (ER)
-
-```mermaid
-erDiagram
-    users ||--o{ registrations : "đăng ký"
-    workshops ||--o{ registrations : "nhận"
-
-    users {
-        uuid id PK
-        varchar student_code "nullable, unique khi có"
-        varchar email "NOT NULL, unique lower(email)"
-        text password
-        text full_name
-        role_code role
-        user_status status
-        timestamptz created_at
-        timestamptz updated_at
-    }
-
-    workshops {
-        uuid id PK
-        text title
-        text speaker
-        text room
-        text room_map_url "nullable"
-        timestamptz starts_at
-        timestamptz ends_at
-        int capacity
-        int seats_left
-        boolean is_paid
-        numeric price "nullable"
-        workshop_status status
-        text summary "nullable"
-        summary_status summary_status
-        int version
-        timestamptz created_at
-        timestamptz updated_at
-    }
-
-    registrations {
-        uuid id PK
-        uuid user_id FK
-        uuid workshop_id FK
-        registration_status status
-        timestamptz reserved_at
-        timestamptz expires_at "nullable"
-        timestamptz confirmed_at "nullable"
-        text qr_token "nullable, unique khi có"
-        timestamptz created_at
-        timestamptz updated_at
-    }
-```
 
 ---
 
@@ -159,7 +300,7 @@ Luồng mô phỏng việc hệ thống quản lý sinh viên (SIS) export CSV v
 
 #### Kích hoạt và hàng đợi
 
-- **API**: `POST /student-sync`, multipart field **`file`**, chỉ role **`admin`**. Kiểm tra đuôi `.csv`, kích thước tối đa **12 MiB**, đọc UTF-8; nếu thiếu file hoặc rỗng thì `400`.
+- **API**: `POST /student-sync`, multipart field `**file`**, chỉ role `**admin`**. Kiểm tra đuôi `.csv`, kích thước tối đa **12 MiB**, đọc UTF-8; nếu thiếu file hoặc rỗng thì `400`.
 - **Worker**: Nội dung CSV được đưa vào **BullMQ** queue `student-sync`, job name `run`. Processor đọc `csvText` trong payload và gọi `StudentSyncService.syncFromCsvText`.
 - **Lịch "đêm"**: Code hiện **không** gắn `@Cron` do không có thông tin về file CSV sẽ export thế nào; có thể đặt **cron hoặc job scheduler** trong server / bên ngoài hoặc tự động quét CSV trong database (API hỗ trợ?). Dễ dàng update thông qua `student-sync` module.
 
@@ -167,7 +308,7 @@ Cấu hình queue (module): **1 lần thử** mỗi job; giữ lỗi trong Redis
 
 #### Theo dõi job
 
-- `GET /student-sync/jobs/:jobId` — trả `state` (`waiting`, `active`, `completed`, `failed`, …). Khi `completed`, kèm **`report`** (`imported`, `skippedRows`, `duplicateIdsSuperseded`, `issues`); khi `failed`, có `failedReason`.
+- `GET /student-sync/jobs/:jobId` — trả `state` (`waiting`, `active`, `completed`, `failed`, …). Khi `completed`, kèm `**report` (`imported`, `skippedRows`, `duplicateIdsSuperseded`, `issues`); khi `failed`, có `failedReason`.
 
 #### Định dạng CSV (ETL)
 
@@ -175,7 +316,7 @@ Cấu hình queue (module): **1 lần thử** mỗi job; giữ lỗi trong Redis
 - Parser **bỏ BOM**, bỏ dòng trống; tách ô theo **dấu phẩy đơn giản** (`split`) — **không** hỗ trợ định dạng CSV có trường bọc ngoặc kép / dấu phẩy trong cell.
 - `status`: `active` hoặc `disabled` (không phân biệt hoa thường).
 - `created_at` / `updated_at`: chuỗi thời gian; parser chuẩn hoá khoảng trắng → `T` và một số dạng offset ngắn trước khi `new Date(...)`.
-- Mỗi dòng hợp lệ được map sang bản ghi đồng bộ với **`role: 'student'`**.
+- Mỗi dòng hợp lệ được map sang bản ghi đồng bộ với `**role: 'student'`.
 
 #### Xử lý trùng và lỗi tại tầng file
 
@@ -185,7 +326,7 @@ Cấu hình queue (module): **1 lần thử** mỗi job; giữ lỗi trong Redis
 
 #### Ghi CSDL (`users`)
 
-- Với mỗi dòng đã qua parse, **`UsersRepository.upsertSyncedStudentsReport`** gọi Prisma **`upsert`** theo `id` (**không bọc toàn bộ file trong một transaction** — một dòng lỗi không rollback các dòng khác).
+- Với mỗi dòng đã qua parse, `**UsersRepository.upsertSyncedStudentsReport`** gọi Prisma `**upsert`** theo `id` (**không bọc toàn bộ file trong một transaction** — một dòng lỗi không rollback các dòng khác).
 - **Không ghi đè** nếu `id` đã tồn tại và `role !== 'student'` → issue `role_conflict`.
 - **Không ghi** nếu `email` hoặc `student_code` (khi có) **đụng người dùng khác id** trong DB → `email_exists_db` / `student_code_exists_db`.
 - Lỗi Prisma/Exception khác trên từng dòng → `db_error` (message kèm chi tiết).
