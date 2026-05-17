@@ -65,9 +65,9 @@ export function AdminLayout() {
   }
 
   return (
-    <div className="min-h-screen flex">
-      <aside className="hidden lg:flex w-64 flex-col border-r border-slate-200 bg-white">
-        <div className="flex h-16 items-center gap-2 border-b border-slate-100 px-5">
+    <div className="flex min-h-screen lg:h-dvh lg:max-h-dvh lg:overflow-hidden">
+      <aside className="hidden h-full min-h-0 w-64 shrink-0 flex-col border-r border-slate-200 bg-white lg:flex">
+        <div className="flex h-16 shrink-0 items-center gap-2 border-b border-slate-100 px-5">
           <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-brand-600 text-white font-bold">
             U
           </span>
@@ -77,7 +77,7 @@ export function AdminLayout() {
           </div>
         </div>
 
-        <nav className="flex-1 space-y-1 p-3">
+        <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto p-3">
           <NavLink to="/" end className={navItem}>
             <LayoutDashboard className="h-4 w-4" />
             Tổng quan
@@ -98,7 +98,7 @@ export function AdminLayout() {
           )}
         </nav>
 
-        <div className="border-t border-slate-100 p-3">
+        <div className="shrink-0 border-t border-slate-100 p-3">
           <div className="px-2 pb-2 text-xs text-slate-500">
             <p className="font-medium text-slate-700">{user?.fullName}</p>
             <p className="truncate">{user?.email}</p>
@@ -115,8 +115,8 @@ export function AdminLayout() {
         </div>
       </aside>
 
-      <div className="flex-1 flex flex-col">
-        <header className="lg:hidden sticky top-0 z-10 border-b border-slate-200 bg-white">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+        <header className="sticky top-0 z-10 shrink-0 border-b border-slate-200 bg-white lg:hidden">
           <div className="flex h-14 items-center justify-between px-4">
             <Link to="/" className="font-semibold">
               UniHub Admin
@@ -147,7 +147,7 @@ export function AdminLayout() {
           </nav>
         </header>
 
-        <main className="flex-1 p-6">
+        <main className="min-h-0 flex-1 overflow-y-auto p-6">
           <Outlet />
         </main>
       </div>
