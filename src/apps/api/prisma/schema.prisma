@@ -36,6 +36,7 @@ model User {
 
   registrations Registration[]
   staffCheckins Checkin[]        @relation("StaffCheckins")
+  notifications Notification[]
 
   @@map("users")
 }
@@ -149,4 +150,26 @@ model Checkin {
 
   @@unique([staffUserId, clientEventId], map: "checkins_staff_user_client_event_unique")
   @@map("checkins")
+}
+
+enum NotificationStatus {
+  pending
+  sent
+  failed
+
+  @@map("notification_status")
+}
+
+model Notification {
+  id           String             @id @default(uuid()) @db.Uuid
+  userId       String             @map("user_id") @db.Uuid
+  templateCode String             @map("template_code") @db.VarChar(64)
+  payloadJson  Json               @default("{}") @map("payload_json")
+  status       NotificationStatus @default(pending)
+  createdAt    DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  sentAt       DateTime?          @map("sent_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@map("notifications")
 }

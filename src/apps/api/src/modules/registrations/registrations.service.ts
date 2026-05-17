@@ -9,6 +9,7 @@ import type { CreateRegistrationResponse, Registration } from '@unihub/types';
 import type { PaymentWithRegistration } from '../database/repository/payments.repository';
 import { PaymentsRepository } from '../database/repository/payments.repository';
 import { RegistrationsRepository } from '../database/repository/registrations.repository';
+import { NotificationsService } from '../notifications/notifications.service';
 import { WorkshopsService } from '../workshops/workshops.service';
 
 @Injectable()
@@ -17,6 +18,7 @@ export class RegistrationsService {
     private readonly registrationsRepo: RegistrationsRepository,
     private readonly workshops: WorkshopsService,
     private readonly paymentsRepo: PaymentsRepository,
+    private readonly notifications: NotificationsService,
   ) {}
 
   /** Ensures replay belongs to the same caller and intent (workshop scope). */
@@ -194,6 +196,14 @@ export class RegistrationsService {
 
     const registration = await this.attachWorkshop(result.registration);
     const isPaid = registration.workshop?.isPaid ?? false;
+
+    if (!isPaid) {
+      await this.notifications.enqueueSafe(userId, 'registration_success', {
+        registrationId: registration.id,
+        workshopId: registration.workshopId,
+        workshopTitle: registration.workshop?.title ?? null,
+      });
+    }
 
     return {
       registration,

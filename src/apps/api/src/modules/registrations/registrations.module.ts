@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { NotificationsModule } from '../notifications/notifications.module';
 import { AuthModule } from '../auth/auth.module';
 import { DatabaseModule } from '../database/database.module';
 import { PaymentsModule } from '../payments/payments.module';
@@ -8,7 +9,13 @@ import { RegistrationsService } from './registrations.service';
 import { WorkshopRegistrationsController } from './workshop-registrations.controller';
 
 @Module({
-  imports: [DatabaseModule, AuthModule, WorkshopsModule, PaymentsModule],
+  imports: [
+    DatabaseModule,
+    AuthModule,
+    WorkshopsModule,
+    PaymentsModule,
+    NotificationsModule,
+  ],
   controllers: [RegistrationsController, WorkshopRegistrationsController],
   providers: [RegistrationsService],
   exports: [RegistrationsService],

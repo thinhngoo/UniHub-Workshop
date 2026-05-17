@@ -14,6 +14,7 @@ import type {
   Workshop as DbWorkshop,
 } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 type PaymentWithRelations = DbPayment & {
   registration: DbRegistration & { workshop: DbWorkshop | null };
@@ -21,7 +22,10 @@ type PaymentWithRelations = DbPayment & {
 
 @Injectable()
 export class PaymentsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notifications: NotificationsService,
+  ) {}
 
   private decimalToMoney(n: DbPayment['amount']): number {
     return Number(n.toString());
@@ -167,6 +171,19 @@ export class PaymentsService {
         where: { id: paymentId },
       }) as Promise<DbPayment>;
     });
+
+    const workshopTitle = bundle.registration.workshop?.title ?? 'Workshop';
+
+    await this.notifications.enqueueSafe(
+      bundle.registration.userId,
+      'payment_success',
+      {
+        registrationId: regId,
+        paymentId: paymentId,
+        workshopTitle,
+        amount: this.decimalToMoney(updatedPayment.amount),
+      },
+    );
 
     return {
       payment: this.toDto(updatedPayment),

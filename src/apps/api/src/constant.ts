@@ -31,3 +31,6 @@ export const STUDENT_SYNC_MAX_FILE_BYTES = 12 * 1024 * 1024; // 12MB
 export const WORKSHOP_SUMMARY_QUEUE = 'workshop-summary';
 export const WORKSHOP_SUMMARY_JOB_NAME = 'extract-from-pdf';
 export const WORKSHOP_SUMMARY_MAX_PDF_BYTES = 12 * 1024 * 1024; // 12MB
+
+export const NOTIFICATION_QUEUE = 'notifications';
+export const NOTIFICATION_DISPATCH_JOB_NAME = 'dispatch';
