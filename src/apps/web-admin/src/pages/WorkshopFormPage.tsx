@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -87,6 +87,14 @@ export function WorkshopFormPage({ mode }: Props) {
     message: string;
   } | null>(null);
   const [pendingSummaryJobId, setPendingSummaryJobId] = useState<string | null>(null);
+  const [summaryPdfFile, setSummaryPdfFile] = useState<File | null>(null);
+  const summaryPdfInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    setSummaryPdfFile(null);
+    const el = summaryPdfInputRef.current;
+    if (el) el.value = '';
+  }, [id]);
 
   const existingQuery = useQuery({
     queryKey: ['workshop', id],
@@ -171,7 +179,7 @@ export function WorkshopFormPage({ mode }: Props) {
   });
 
   const summaryMutation = useMutation({
-    mutationFn: () => api.workshops.triggerSummary(id!),
+    mutationFn: (file: File) => api.workshops.triggerSummary(id!, file),
     onMutate: () => setSummaryBanner(null),
     onSuccess: async (data) => {
       setPendingSummaryJobId(data.jobId);
@@ -220,6 +228,9 @@ export function WorkshopFormPage({ mode }: Props) {
         });
       }
       setPendingSummaryJobId(null);
+      setSummaryPdfFile(null);
+      const inputEl = summaryPdfInputRef.current;
+      if (inputEl) inputEl.value = '';
     })();
   }, [pendingSummaryJobId, summaryJobQuery.data, id, qc]);
 
@@ -355,6 +366,39 @@ export function WorkshopFormPage({ mode }: Props) {
                   )}
                 </p>
                 <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <input
+                    ref={summaryPdfInputRef}
+                    type="file"
+                    accept="application/pdf,.pdf"
+                    className="hidden"
+                    onChange={(e) => setSummaryPdfFile(e.target.files?.[0] ?? null)}
+                  />
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    className="cursor-pointer"
+                    disabled={
+                      summaryMutation.isPending ||
+                      isSummaryPipelineBusy ||
+                      isLoadingEditWorkshop ||
+                      updateMutation.isPending ||
+                      !id
+                    }
+                    onClick={() => summaryPdfInputRef.current?.click()}
+                  >
+                    Chọn PDF
+                  </Button>
+                  {summaryPdfFile ? (
+                    <span
+                      className="max-w-[220px] truncate text-xs text-slate-600"
+                      title={summaryPdfFile.name}
+                    >
+                      {summaryPdfFile.name}
+                    </span>
+                  ) : (
+                    <span className="text-xs text-slate-500">Chưa chọn file</span>
+                  )}
                   <Button
                     type="button"
                     variant="secondary"
@@ -365,9 +409,12 @@ export function WorkshopFormPage({ mode }: Props) {
                       isSummaryPipelineBusy ||
                       isLoadingEditWorkshop ||
                       updateMutation.isPending ||
-                      !id
+                      !id ||
+                      !summaryPdfFile
                     }
-                    onClick={() => summaryMutation.mutate()}
+                    onClick={() =>
+                      summaryPdfFile ? summaryMutation.mutate(summaryPdfFile) : undefined
+                    }
                   >
                     <Sparkles className="size-4 shrink-0" />
                     {summaryMutation.isPending

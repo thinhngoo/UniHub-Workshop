@@ -131,15 +131,6 @@ export class WorkshopsController {
     return this.workshops.createWorkshop(body);
   }
 
-  @Post(':id/reserve-seat')
-  @HttpCode(HttpStatus.OK)
-  @UseGuards(AuthGuard, RolesGuard)
-  @Roles('student')
-  async reserveSeat(@Param('id') id: string): Promise<{ reserved: true }> {
-    await this.workshops.reserveSeat(id);
-    return { reserved: true };
-  }
-
   @Post(':id/summary')
   @HttpCode(HttpStatus.OK)
   @UseGuards(AuthGuard, RolesGuard)

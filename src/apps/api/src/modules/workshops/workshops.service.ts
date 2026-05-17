@@ -38,33 +38,6 @@ export class WorkshopsService {
     return this.workshopsRepo.listAllOrdered();
   }
 
-  async tryReserveSeat(workshopId: string): Promise<boolean> {
-    return this.workshopsRepo.tryDecrementSeats(workshopId);
-  }
-
-  async reserveSeat(workshopId: string) {
-    const w = await this.workshopsRepo.findById(workshopId);
-    if (!w) {
-      throw new NotFoundException({
-        code: 'not_found',
-        message: 'Workshop không tồn tại.',
-      });
-    }
-    if (w.status !== 'published') {
-      throw new BadRequestException({
-        code: 'workshop_not_open',
-        message: 'Workshop chưa mở đăng ký.',
-      });
-    }
-    const ok = await this.workshopsRepo.tryDecrementSeats(workshopId);
-    if (!ok) {
-      throw new ConflictException({
-        code: 'no_seats',
-        message: 'Đã hết chỗ.',
-      });
-    }
-  }
-
   assertValidSchedule(startsAtIso: string, endsAtIso: string): void {
     const startMs = Date.parse(startsAtIso);
     const endMs = Date.parse(endsAtIso);

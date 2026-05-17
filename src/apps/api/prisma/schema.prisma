@@ -34,6 +34,8 @@ model User {
   createdAt   DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt   DateTime   @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
+  registrations Registration[]
+
   @@map("users")
 }
 
@@ -73,5 +75,34 @@ model Workshop {
   createdAt      DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt      DateTime               @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
+  registrations Registration[]
+
   @@map("workshops")
+}
+
+enum RegistrationStatus {
+  reserved
+  confirmed
+  cancelled
+  expired
+
+  @@map("registration_status")
+}
+
+model Registration {
+  id          String             @id @default(uuid()) @db.Uuid
+  userId      String             @map("user_id") @db.Uuid
+  workshopId  String             @map("workshop_id") @db.Uuid
+  status      RegistrationStatus
+  reservedAt  DateTime           @map("reserved_at") @db.Timestamptz(6)
+  expiresAt   DateTime?          @map("expires_at") @db.Timestamptz(6)
+  confirmedAt DateTime?          @map("confirmed_at") @db.Timestamptz(6)
+  qrToken     String?            @map("qr_token")
+  createdAt   DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime           @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Restrict)
+  workshop Workshop @relation(fields: [workshopId], references: [id], onDelete: Restrict)
+
+  @@map("registrations")
 }

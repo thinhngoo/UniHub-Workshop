@@ -26,7 +26,8 @@ export const REDIS_DEFAULT_URL = 'redis://127.0.0.1:6379';
 
 export const STUDENT_SYNC_QUEUE = 'student-sync';
 export const STUDENT_SYNC_JOB_NAME = 'run';
-export const STUDENT_SYNC_MAX_FILE_BYTES = 10 * 1024 * 1024; // 10MB
+export const STUDENT_SYNC_MAX_FILE_BYTES = 12 * 1024 * 1024; // 12MB
 
 export const WORKSHOP_SUMMARY_QUEUE = 'workshop-summary';
 export const WORKSHOP_SUMMARY_JOB_NAME = 'extract-from-pdf';
+export const WORKSHOP_SUMMARY_MAX_PDF_BYTES = 12 * 1024 * 1024; // 12MB

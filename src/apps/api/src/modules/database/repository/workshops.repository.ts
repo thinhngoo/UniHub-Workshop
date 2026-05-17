@@ -90,18 +90,6 @@ export class WorkshopsRepository {
     return rows.map((r) => this.toDomain(r));
   }
 
-  /**
-   * Atomically decreases seats_left by 1 when the workshop still has capacity.
-   * Use from registration reserve flows (single row UPDATE … WHERE seats_left > 0).
-   */
-  async tryDecrementSeats(workshopId: string): Promise<boolean> {
-    const result = await this.prisma.workshop.updateMany({
-      where: { id: workshopId, seatsLeft: { gt: 0 } },
-      data: { seatsLeft: { decrement: 1 } },
-    });
-    return result.count === 1;
-  }
-
   async create(input: CreateWorkshopRequest): Promise<DomainWorkshop> {
     const row = await this.prisma.workshop.create({
       data: {

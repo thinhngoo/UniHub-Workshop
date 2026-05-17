@@ -26,20 +26,18 @@ export function WorkshopDetailPage() {
   });
 
   const registerMutation = useMutation({
-    mutationFn: async () => {
-      await api.workshops.tryReserveSeat(id!);
-      // return api.registrations.create({ workshopId: id! }, idempotencyKey);
-    },
+    mutationFn: () =>
+      api.registrations.create({ workshopId: id! }, idempotencyKey),
     onSuccess: (res) => {
       qc.invalidateQueries({ queryKey: ['workshop', id] });
       qc.invalidateQueries({ queryKey: ['my-registrations'] });
-      // if (res.paymentRequired) {
-      //   navigate(`/me/registrations/${res.registration.id}/qr`, {
-      //     state: { paymentPending: true },
-      //   });
-      // } else {
-      //   navigate(`/me/registrations/${res.registration.id}/qr`);
-      // }
+      if (res.paymentRequired) {
+        navigate(`/me/registrations/${res.registration.id}/qr`, {
+          state: { paymentPending: true },
+        });
+      } else {
+        navigate(`/me/registrations/${res.registration.id}/qr`);
+      }
     },
     onError: (e: unknown) => {
       if (e instanceof ApiError) setError(e.message);

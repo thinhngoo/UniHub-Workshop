@@ -16,10 +16,6 @@ export const workshopsApi = (http: AxiosInstance) => ({
       .get<PaginatedResponse<Workshop>>('/workshops', { params: query })
       .then((r) => r.data),
   getById: (id: UUID) => http.get<Workshop>(`/workshops/${id}`).then((r) => r.data),
-  tryReserveSeat: (id: UUID) =>
-    http
-      .post<{ reserved: true }>(`/workshops/${id}/reserve-seat`)
-      .then((r) => r.data),
   create: (body: CreateWorkshopRequest) =>
     http.post<Workshop>('/workshops', body).then((r) => r.data),
   update: (id: UUID, body: UpdateWorkshopRequest) =>
@@ -39,10 +35,15 @@ export const workshopsApi = (http: AxiosInstance) => ({
       })
       .then((r) => r.data);
   },
-  triggerSummary: (id: UUID) =>
-    http
-      .post<WorkshopSummaryQueuedResponse>(`/workshops/${id}/summary`)
-      .then((r) => r.data),
+  triggerSummary: (id: UUID, file: File) => {
+    const form = new FormData();
+    form.append('file', file);
+    return http
+      .post<WorkshopSummaryQueuedResponse>(`/workshops/${id}/summary`, form, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      })
+      .then((r) => r.data);
+  },
   getSummaryJobStatus: (jobId: string) =>
     http
       .get<WorkshopSummaryJobStatusResponse>(
