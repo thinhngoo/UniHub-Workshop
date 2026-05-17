@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { PaymentsModule } from './modules/payments/payments.module';
 import { AdminModule } from './modules/admin/admin.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { CheckinModule } from './modules/checkin/checkin.module';
@@ -17,6 +18,7 @@ import { WorkshopsModule } from './modules/workshops/workshops.module';
     AuthModule,
     WorkshopsModule,
     RegistrationsModule,
+    PaymentsModule,
     AdminModule,
     CheckinModule,
     StudentSyncModule,

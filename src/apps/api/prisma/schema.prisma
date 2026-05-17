@@ -35,6 +35,7 @@ model User {
   updatedAt   DateTime   @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   registrations Registration[]
+  staffCheckins Checkin[]        @relation("StaffCheckins")
 
   @@map("users")
 }
@@ -104,6 +105,7 @@ model Registration {
   user     User      @relation(fields: [userId], references: [id], onDelete: Restrict)
   workshop Workshop  @relation(fields: [workshopId], references: [id], onDelete: Restrict)
   payment  Payment?
+  checkin  Checkin?
 
   @@map("registrations")
 }
@@ -132,4 +134,19 @@ model Payment {
   registration Registration @relation(fields: [registrationId], references: [id], onDelete: Restrict)
 
   @@map("payments")
+}
+
+model Checkin {
+  id               String       @id @default(uuid()) @db.Uuid
+  registrationId   String       @unique @map("registration_id") @db.Uuid
+  clientEventId    String       @map("client_event_id") @db.Uuid
+  scannedAt        DateTime     @map("scanned_at") @db.Timestamptz(6)
+  receivedAt       DateTime     @default(now()) @map("received_at") @db.Timestamptz(6)
+  staffUserId      String       @map("staff_user_id") @db.Uuid
+
+  registration Registration @relation(fields: [registrationId], references: [id], onDelete: Restrict)
+  staffUser    User          @relation("StaffCheckins", fields: [staffUserId], references: [id], onDelete: Restrict)
+
+  @@unique([staffUserId, clientEventId], map: "checkins_staff_user_client_event_unique")
+  @@map("checkins")
 }
