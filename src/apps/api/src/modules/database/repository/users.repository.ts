@@ -41,6 +41,21 @@ export class UsersRepository {
     return row ? this.toDomainUser(row) : null;
   }
 
+  /** Map user ids → full names for aggregates (dashboard, reports). */
+  async lookupFullNamesByIds(
+    ids: readonly string[],
+  ): Promise<Record<string, string>> {
+    const unique = [...new Set(ids.filter(Boolean))];
+    if (unique.length === 0) return {};
+    const rows = await this.prisma.user.findMany({
+      where: { id: { in: unique } },
+      select: { id: true, fullName: true },
+    });
+    const out: Record<string, string> = {};
+    for (const r of rows) out[r.id] = r.fullName;
+    return out;
+  }
+
   /** Not using a transaction to avoid a failure in one row causing all to fail. */
   async upsertSyncedStudentsReport(
     rows: SyncedStudentUser[],

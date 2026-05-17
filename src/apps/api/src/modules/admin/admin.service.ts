@@ -6,13 +6,12 @@ import type {
   RegistrationStatus,
   SummaryStatus,
   Workshop,
-  WorkshopStatus,
 } from '@unihub/types';
-import { AppDataStore } from '../database/app-data.store';
+import { WORKSHOP_STATUSES } from '../../constant';
+import { UsersRepository } from '../database/repository/users.repository';
 import { RegistrationsService } from '../registrations/registrations.service';
 import { WorkshopsService } from '../workshops/workshops.service';
 
-const WORKSHOP_STATUSES: WorkshopStatus[] = ['draft', 'published', 'cancelled'];
 const SUMMARY_STATUSES: SummaryStatus[] = [
   'none',
   'pending',
@@ -33,17 +32,19 @@ const RECENT_LIMIT = 8;
 @Injectable()
 export class AdminService {
   constructor(
-    private readonly data: AppDataStore,
+    private readonly users: UsersRepository,
     private readonly workshops: WorkshopsService,
     private readonly registrations: RegistrationsService,
   ) {}
 
-  getDashboard(): AdminDashboardSummary {
-    const allWorkshops = this.workshops.listAllRaw();
-    const allRegistrations = this.registrations.listAll();
-    const nowIso = this.data.getReferenceNowIso();
-    const userLookup = this.data.getUserDisplayNames();
-    const nowMs = Date.parse(nowIso);
+  async getDashboard(): Promise<AdminDashboardSummary> {
+    const allWorkshops = await this.workshops.listAllRaw();
+    const allRegistrations = await this.registrations.listAll();
+    const nowIso = new Date().toISOString();
+    const userLookup = await this.users.lookupFullNamesByIds(
+      allRegistrations.map((r) => r.userId),
+    );
+    const nowMs = Date.now();
 
     const workshopsByStatus = countBy(
       WORKSHOP_STATUSES,

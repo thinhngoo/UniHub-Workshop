@@ -1,8 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { AppDataStore } from './app-data.store';
 import { encodeDatabaseUrl } from './encode-database-url';
-import { InMemoryAppDataStore } from './in-memory-app-data.store';
 import { PrismaService } from './prisma.service';
 import { RedisService } from './redis.service';
 import { PaymentsRepository } from './repository/payments.repository';
@@ -31,14 +29,9 @@ import { WorkshopsRepository } from './repository/workshops.repository';
     WorkshopsRepository,
     RegistrationsRepository,
     PaymentsRepository,
-    {
-      provide: AppDataStore,
-      useClass: InMemoryAppDataStore,
-    },
     RedisService,
   ],
   exports: [
-    AppDataStore,
     PrismaService,
     RedisService,
     UsersRepository,
