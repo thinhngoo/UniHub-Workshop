@@ -11,6 +11,7 @@ import { PaymentsRepository } from '../database/repository/payments.repository';
 import { RegistrationsRepository } from '../database/repository/registrations.repository';
 import { NotificationsService } from '../notifications/notifications.service';
 import { WorkshopsService } from '../workshops/workshops.service';
+import { ReservationHoldQueueService } from './reservation-hold.queue';
 
 @Injectable()
 export class RegistrationsService {
@@ -19,6 +20,7 @@ export class RegistrationsService {
     private readonly workshops: WorkshopsService,
     private readonly paymentsRepo: PaymentsRepository,
     private readonly notifications: NotificationsService,
+    private readonly reservationHold: ReservationHoldQueueService,
   ) {}
 
   /** Ensures replay belongs to the same caller and intent (workshop scope). */
@@ -50,6 +52,7 @@ export class RegistrationsService {
     const registration = await this.attachWorkshop(
       this.registrationsRepo.toDomain(replay.registration),
     );
+    await this.scheduleHoldReleaseIfNeeded(registration);
     return {
       registration,
       paymentRequired: true,
@@ -203,6 +206,8 @@ export class RegistrationsService {
         workshopId: registration.workshopId,
         workshopTitle: registration.workshop?.title ?? null,
       });
+    } else {
+      await this.scheduleHoldReleaseIfNeeded(registration);
     }
 
     return {
@@ -215,5 +220,16 @@ export class RegistrationsService {
   private async attachWorkshop(reg: Registration): Promise<Registration> {
     const workshop = await this.workshops.findById(reg.workshopId);
     return workshop ? { ...reg, workshop } : { ...reg };
+  }
+
+  /** Delayed job Redis/BullMQ — đặt lại sau replay idempotency nếu vẫn đang giữ chỗ. */
+  private async scheduleHoldReleaseIfNeeded(
+    registration: Registration,
+  ): Promise<void> {
+    if (registration.status !== 'reserved' || !registration.expiresAt) return;
+    await this.reservationHold.scheduleRelease(
+      registration.id,
+      new Date(registration.expiresAt),
+    );
   }
 }

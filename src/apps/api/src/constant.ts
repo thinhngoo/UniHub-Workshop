@@ -34,3 +34,8 @@ export const WORKSHOP_SUMMARY_MAX_PDF_BYTES = 12 * 1024 * 1024; // 12MB
 
 export const NOTIFICATION_QUEUE = 'notifications';
 export const NOTIFICATION_DISPATCH_JOB_NAME = 'dispatch';
+
+export const RESERVATION_HOLD_MINUTES = 15;
+
+export const RESERVATION_EXPIRY_QUEUE = 'reservation-expiry';
+export const RESERVATION_EXPIRY_JOB_NAME = 'release-hold';

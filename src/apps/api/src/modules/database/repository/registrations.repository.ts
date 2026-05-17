@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Prisma, type Registration as DbRegistration } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
 import type { Registration as DomainRegistration } from '@unihub/types';
+import { RESERVATION_HOLD_MINUTES } from '../../../constant';
 import { PrismaService } from '../prisma.service';
 
 type RegisterSeatFailure =
@@ -125,7 +126,9 @@ export class RegistrationsRepository {
             workshopId,
             status: isPaid ? 'reserved' : 'confirmed',
             reservedAt: now,
-            expiresAt: isPaid ? addMinutes(now, 15) : null,
+            expiresAt: isPaid
+              ? addMinutes(now, RESERVATION_HOLD_MINUTES)
+              : null,
             confirmedAt: isPaid ? null : now,
             qrToken: isPaid
               ? null
@@ -205,5 +208,48 @@ export class RegistrationsRepository {
   async findById(id: string): Promise<DomainRegistration | null> {
     const row = await this.prisma.registration.findUnique({ where: { id } });
     return row ? this.toDomain(row) : null;
+  }
+
+  async releaseSeatHoldIfStillReserved(
+    registrationId: string,
+  ): Promise<boolean> {
+    return this.prisma.$transaction(async (tx) => {
+      const updated = await tx.registration.updateMany({
+        where: {
+          id: registrationId,
+          status: 'reserved',
+        },
+        data: {
+          status: 'expired',
+          expiresAt: null,
+        },
+      });
+      if (updated.count !== 1) return false;
+
+      const reg = await tx.registration.findUnique({
+        where: { id: registrationId },
+        select: { workshopId: true },
+      });
+      if (!reg) return false;
+
+      await tx.workshop.update({
+        where: { id: reg.workshopId },
+        data: { seatsLeft: { increment: 1 } },
+      });
+
+      await tx.payment.updateMany({
+        where: {
+          registrationId,
+          status: 'pending',
+        },
+        data: {
+          status: 'failed',
+          lastError:
+            'Hết thời gian giữ chỗ — đăng ký đã hết hạn; chỗ đã được giải phóng.',
+        },
+      });
+
+      return true;
+    });
   }
 }

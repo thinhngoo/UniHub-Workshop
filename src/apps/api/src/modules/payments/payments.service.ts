@@ -15,6 +15,7 @@ import type {
 } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { ReservationHoldQueueService } from '../registrations/reservation-hold.queue';
 
 type PaymentWithRelations = DbPayment & {
   registration: DbRegistration & { workshop: DbWorkshop | null };
@@ -25,6 +26,7 @@ export class PaymentsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsService,
+    private readonly reservationHold: ReservationHoldQueueService,
   ) {}
 
   private decimalToMoney(n: DbPayment['amount']): number {
@@ -171,6 +173,8 @@ export class PaymentsService {
         where: { id: paymentId },
       }) as Promise<DbPayment>;
     });
+
+    await this.reservationHold.cancelScheduledRelease(regId);
 
     const workshopTitle = bundle.registration.workshop?.title ?? 'Workshop';
 
