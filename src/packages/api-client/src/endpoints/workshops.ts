@@ -6,6 +6,8 @@ import type {
   UUID,
   Workshop,
   WorkshopListQuery,
+  WorkshopSummaryJobStatusResponse,
+  WorkshopSummaryQueuedResponse,
 } from '@unihub/types';
 
 export const workshopsApi = (http: AxiosInstance) => ({
@@ -39,6 +41,12 @@ export const workshopsApi = (http: AxiosInstance) => ({
   },
   triggerSummary: (id: UUID) =>
     http
-      .post<{ status: 'pending' }>(`/workshops/${id}/summary`)
+      .post<WorkshopSummaryQueuedResponse>(`/workshops/${id}/summary`)
+      .then((r) => r.data),
+  getSummaryJobStatus: (jobId: string) =>
+    http
+      .get<WorkshopSummaryJobStatusResponse>(
+        `/workshops/summary-jobs/${encodeURIComponent(jobId)}`,
+      )
       .then((r) => r.data),
 });

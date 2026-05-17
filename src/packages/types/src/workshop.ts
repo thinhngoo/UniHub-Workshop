@@ -51,3 +51,25 @@ export interface UpdateWorkshopRequest extends Partial<CreateWorkshopRequest> {
   summary?: string | null;
   summaryStatus?: SummaryStatus;
 }
+
+export interface WorkshopSummaryQueuedResponse {
+  status: 'pending';
+  jobId: string;
+}
+
+export type WorkshopSummaryJobState =
+  | 'waiting'
+  | 'active'
+  | 'completed'
+  | 'failed'
+  | 'delayed'
+  | 'paused'
+  | 'unknown';
+
+export interface WorkshopSummaryJobStatusResponse {
+  jobId: string;
+  state: WorkshopSummaryJobState;
+  workshopId?: UUID;
+  outcome?: 'ready' | 'failed';
+  failedReason?: string;
+}

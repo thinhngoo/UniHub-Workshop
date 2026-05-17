@@ -5,7 +5,13 @@ import { z } from 'zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ApiError } from '@unihub/api-client';
-import type { CreateWorkshopRequest, UpdateWorkshopRequest, WorkshopStatus } from '@unihub/types';
+import { Sparkles } from 'lucide-react';
+import type {
+  CreateWorkshopRequest,
+  SummaryStatus,
+  UpdateWorkshopRequest,
+  WorkshopStatus,
+} from '@unihub/types';
 import { cn } from '@unihub/format/cn';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -18,7 +24,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
+import { Input, Textarea } from '@/components/ui/input';
 import { api } from '@/lib/api';
 
 const WORKSHOP_STATUSES = [
@@ -33,6 +39,13 @@ const WORKSHOP_STATUS_LABEL: Record<WorkshopStatus, string> = {
   cancelled: 'Đã hủy',
 };
 
+const SUMMARY_STATUS_LABEL: Record<SummaryStatus, string> = {
+  none: 'Chưa có',
+  pending: 'Đang xử lý',
+  ready: 'Đã có bản giới thiệu',
+  failed: 'Thất bại',
+};
+
 const schema = z
   .object({
     title: z.string().min(3, 'Tiêu đề tối thiểu 3 ký tự'),
@@ -45,6 +58,7 @@ const schema = z
     isPaid: z.boolean(),
     price: z.coerce.number().int().min(0).optional(),
     status: z.enum(WORKSHOP_STATUSES),
+    summary: z.string(),
   })
   .refine((d) => new Date(d.endsAt) > new Date(d.startsAt), {
     message: 'Kết thúc phải sau bắt đầu',
@@ -68,6 +82,11 @@ export function WorkshopFormPage({ mode }: Props) {
   const [serverError, setServerError] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [summaryBanner, setSummaryBanner] = useState<{
+    tone: 'success' | 'danger';
+    message: string;
+  } | null>(null);
+  const [pendingSummaryJobId, setPendingSummaryJobId] = useState<string | null>(null);
 
   const existingQuery = useQuery({
     queryKey: ['workshop', id],
@@ -94,6 +113,7 @@ export function WorkshopFormPage({ mode }: Props) {
       isPaid: false,
       price: 0,
       status: 'draft',
+      summary: '',
     },
   });
 
@@ -113,6 +133,7 @@ export function WorkshopFormPage({ mode }: Props) {
         isPaid: w.isPaid,
         price: w.price ?? 0,
         status: w.status,
+        summary: w.summary ?? '',
       });
     }
   }, [mode, existingQuery.data, reset]);
@@ -149,6 +170,67 @@ export function WorkshopFormPage({ mode }: Props) {
       setDeleteError(e instanceof ApiError ? e.message : 'Không thể xóa workshop.'),
   });
 
+  const summaryMutation = useMutation({
+    mutationFn: () => api.workshops.triggerSummary(id!),
+    onMutate: () => setSummaryBanner(null),
+    onSuccess: async (data) => {
+      setPendingSummaryJobId(data.jobId);
+      setSummaryBanner({
+        tone: 'success',
+        message: 'Đang xử lý giới thiệu từ PDF…',
+      });
+      await qc.invalidateQueries({ queryKey: ['workshop', id] });
+    },
+    onError: async (e: unknown) => {
+      await qc.invalidateQueries({ queryKey: ['workshop', id] });
+      setSummaryBanner({
+        tone: 'danger',
+        message: e instanceof ApiError ? e.message : 'Không thể xếp hàng xử lý giới thiệu.',
+      });
+    },
+  });
+
+  const summaryJobQuery = useQuery({
+    queryKey: ['workshop-summary-job', pendingSummaryJobId],
+    queryFn: () => api.workshops.getSummaryJobStatus(pendingSummaryJobId!),
+    enabled: mode === 'edit' && !!id && typeof pendingSummaryJobId === 'string',
+    refetchInterval: (query) => {
+      const st = query.state.data?.state;
+      if (st === 'completed' || st === 'failed') return false;
+      return 1500;
+    },
+  });
+
+  useEffect(() => {
+    const d = summaryJobQuery.data;
+    if (!pendingSummaryJobId || !d) return;
+    if (d.state !== 'completed' && d.state !== 'failed') return;
+
+    void (async () => {
+      await qc.invalidateQueries({ queryKey: ['workshop', id] });
+      if (d.state === 'completed' && d.outcome === 'ready') {
+        setSummaryBanner({
+          tone: 'success',
+          message: 'Đã cập nhật giới thiệu từ PDF.',
+        });
+      } else {
+        setSummaryBanner({
+          tone: 'danger',
+          message: d.failedReason ?? 'Không tạo được giới thiệu từ PDF.',
+        });
+      }
+      setPendingSummaryJobId(null);
+    })();
+  }, [pendingSummaryJobId, summaryJobQuery.data, id, qc]);
+
+  const isLoadingEditWorkshop = mode === 'edit' && existingQuery.isPending;
+  const isSummaryPipelineBusy =
+    !!pendingSummaryJobId &&
+    (summaryJobQuery.isPending ||
+      (summaryJobQuery.data?.state !== 'completed' && summaryJobQuery.data?.state !== 'failed'));
+  const isSavingForm = isSubmitting || createMutation.isPending || updateMutation.isPending;
+  const isSaving = isSavingForm || summaryMutation.isPending || isSummaryPipelineBusy;
+
   const onSubmit = (values: FormValues) => {
     setServerError(null);
     const payload = {
@@ -169,6 +251,7 @@ export function WorkshopFormPage({ mode }: Props) {
         ...payload,
         version: existingQuery.data.version,
         status: values.status,
+        summary: values.summary.trim() === '' ? null : values.summary.trim(),
       });
     }
   };
@@ -191,6 +274,8 @@ export function WorkshopFormPage({ mode }: Props) {
         </CardHeader>
         <CardContent>
           <form className="grid gap-4 sm:grid-cols-2" onSubmit={handleSubmit(onSubmit)} noValidate>
+            {mode === 'create' && <input type="hidden" {...register('summary')} />}
+
             <Field label="Tiêu đề" error={errors.title?.message} className="sm:col-span-2">
               <Input {...register('title')} />
             </Field>
@@ -255,6 +340,62 @@ export function WorkshopFormPage({ mode }: Props) {
               </Field>
             )}
 
+            {mode === 'edit' && (
+              <Field label="Giới thiệu" error={errors.summary?.message} className="sm:col-span-2">
+                <p className="text-xs text-slate-500">
+                  Nội dung hiển thị cho sinh viên trên trang chi tiết workshop
+                  {existingQuery.data && (
+                    <>
+                      {' '}
+                      · Trạng thái:{' '}
+                      <span className="font-medium text-slate-600">
+                        {SUMMARY_STATUS_LABEL[existingQuery.data.summaryStatus]}
+                      </span>
+                    </>
+                  )}
+                </p>
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    className="cursor-pointer gap-1.5"
+                    disabled={
+                      summaryMutation.isPending ||
+                      isSummaryPipelineBusy ||
+                      isLoadingEditWorkshop ||
+                      updateMutation.isPending ||
+                      !id
+                    }
+                    onClick={() => summaryMutation.mutate()}
+                  >
+                    <Sparkles className="size-4 shrink-0" />
+                    {summaryMutation.isPending
+                      ? 'Đang gửi…'
+                      : isSummaryPipelineBusy
+                        ? 'Đang xử lý…'
+                        : 'Tạo giới thiệu từ PDF'}
+                  </Button>
+                </div>
+                {summaryBanner && (
+                  <p
+                    className={cn(
+                      'mt-2 text-xs',
+                      summaryBanner.tone === 'success' ? 'text-emerald-700' : 'text-red-600',
+                    )}
+                  >
+                    {summaryBanner.message}
+                  </p>
+                )}
+                <Textarea
+                  {...register('summary')}
+                  rows={8}
+                  placeholder="Nhập hoặc dán nội dung giới thiệu…"
+                  className="mt-1.5 min-h-[180px]"
+                />
+              </Field>
+            )}
+
             {serverError && (
               <div className="sm:col-span-2 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
                 {serverError}
@@ -270,8 +411,22 @@ export function WorkshopFormPage({ mode }: Props) {
               >
                 Hủy
               </Button>
-              <Button type="submit" disabled={isSubmitting} className="cursor-pointer">
-                {isSubmitting ? 'Đang lưu…' : mode === 'create' ? 'Tạo workshop' : 'Lưu thay đổi'}
+              <Button
+                type="submit"
+                disabled={isSaving || isLoadingEditWorkshop}
+                className="cursor-pointer"
+              >
+                {isLoadingEditWorkshop
+                  ? 'Đang tải…'
+                  : summaryMutation.isPending
+                    ? 'Đang gửi…'
+                    : isSummaryPipelineBusy
+                      ? 'Đang tạo giới thiệu…'
+                      : isSavingForm
+                        ? 'Đang lưu…'
+                        : mode === 'create'
+                          ? 'Tạo workshop'
+                          : 'Lưu thay đổi'}
               </Button>
             </div>
           </form>
@@ -317,8 +472,9 @@ export function WorkshopFormPage({ mode }: Props) {
               <DialogHeader>
                 <DialogTitle>Xóa workshop này?</DialogTitle>
                 <DialogDescription>
-                  Workshop <span className="font-semibold">«{existingQuery.data?.title ?? '…'}»</span>{' '}
-                  sẽ bị xóa vĩnh viễn. Thao tác này không thể hoàn tác.
+                  Workshop{' '}
+                  <span className="font-semibold">«{existingQuery.data?.title ?? '…'}»</span> sẽ bị
+                  xóa vĩnh viễn. Thao tác này không thể hoàn tác.
                 </DialogDescription>
               </DialogHeader>
               {deleteError && (

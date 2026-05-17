@@ -53,7 +53,7 @@ export function WorkshopsPage() {
                 <th className="px-4 py-3 font-medium">Phòng</th>
                 <th className="px-4 py-3 font-medium">Chỗ</th>
                 <th className="px-4 py-3 font-medium">Phí</th>
-                <th className="px-4 py-3 font-medium">Trạng thái</th>
+                <th className="px-4 py-3 font-medium text-center">Trạng thái</th>
                 <th className="px-4 py-3" />
               </tr>
             </thead>
@@ -86,7 +86,7 @@ export function WorkshopsPage() {
                   <td className="px-4 py-3 text-slate-700">
                     {w.isPaid ? formatCurrencyVND(w.price) : 'Miễn phí'}
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-3 text-center">
                     <Badge tone={STATUS_TONE[w.status]}>{STATUS_LABEL[w.status]}</Badge>
                   </td>
                   <td className="px-4 py-3 text-right">

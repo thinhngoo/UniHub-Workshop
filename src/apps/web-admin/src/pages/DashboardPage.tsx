@@ -333,7 +333,7 @@ function SummaryStatusCard({ data }: { data: AdminDashboardSummary }) {
               className={cn('size-4', failed > 0 ? 'text-red-500' : 'text-slate-400')}
             />
           }
-          title="Trạng thái tóm tắt bằng AI"
+          title="Hàng đợi giới thiệu"
           subtitle={
             failed > 0 ? `${failed} thất bại` : pending > 0 ? `${pending} đang tạo` : 'Đã hoàn tất'
           }
