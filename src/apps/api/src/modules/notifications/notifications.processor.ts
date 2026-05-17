@@ -1,15 +1,20 @@
+import { MailerService } from '@nestjs-modules/mailer';
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
 import { NOTIFICATION_QUEUE } from '../../constant';
 import { PrismaService } from '../database/prisma.service';
 import type { NotificationDispatchJobData } from './notification-dispatch';
+import { buildNotificationEmailContent } from './notification-mail.content';
 
 @Processor(NOTIFICATION_QUEUE)
 export class NotificationsProcessor extends WorkerHost {
   private readonly logger = new Logger(NotificationsProcessor.name);
 
-  constructor(private readonly prisma: PrismaService) {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly mailer: MailerService,
+  ) {
     super();
   }
 
@@ -24,6 +29,9 @@ export class NotificationsProcessor extends WorkerHost {
 
     const row = await this.prisma.notification.findUnique({
       where: { id: notificationId },
+      include: {
+        user: { select: { email: true, fullName: true } },
+      },
     });
 
     if (!row) {
@@ -38,9 +46,27 @@ export class NotificationsProcessor extends WorkerHost {
     }
 
     try {
-      this.logger.log(
-        `[mock send] notification=${notificationId} template=${row.templateCode}`,
-      );
+      let payload: Record<string, unknown> = {};
+      if (
+        typeof row.payloadJson === 'object' &&
+        row.payloadJson !== null &&
+        !Array.isArray(row.payloadJson)
+      ) {
+        payload = row.payloadJson;
+      }
+
+      const content = buildNotificationEmailContent({
+        templateCode: row.templateCode,
+        payload,
+        recipientName: row.user.fullName,
+      });
+
+      await this.mailer.sendMail({
+        to: row.user.email,
+        subject: content.subject,
+        text: content.text,
+        html: content.html,
+      });
 
       await this.prisma.notification.update({
         where: { id: notificationId },
