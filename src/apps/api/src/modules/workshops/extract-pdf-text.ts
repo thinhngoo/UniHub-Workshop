@@ -1,8 +1,11 @@
-import { readFile } from 'node:fs/promises';
 import pdfParse from 'pdf-parse';
 
-export async function extractPdfPlainText(pdfPath: string): Promise<string> {
-  const buf = await readFile(pdfPath);
-  const result = await pdfParse(buf);
+export function bufferLooksLikePdf(buf: Buffer): boolean {
+  if (buf.length < 5) return false;
+  return buf.subarray(0, 5).toString('latin1') === '%PDF-';
+}
+
+export async function extractPdfPlainText(pdfBuffer: Buffer): Promise<string> {
+  const result = await pdfParse(pdfBuffer);
   return result.text.trim();
 }

@@ -20,11 +20,18 @@ export class WorkshopSummaryProcessor extends WorkerHost {
     job: Job<WorkshopSummaryJobPayload>,
   ): Promise<WorkshopSummaryJobDone> {
     const workshopId = job.data?.workshopId;
+    const pdfBase64 = job.data?.pdfBase64;
     if (typeof workshopId !== 'string' || workshopId.trim().length === 0) {
       throw new Error('Job thiếu workshopId hợp lệ.');
     }
+    if (typeof pdfBase64 !== 'string' || pdfBase64.length === 0) {
+      throw new Error('Job thiếu dữ liệu PDF.');
+    }
     this.logger.log(`Summary PDF job ${job.id} workshop=${workshopId}`);
-    const result = await this.workshopSummary.runQueuedPdfSummary(workshopId);
+    const result = await this.workshopSummary.runQueuedPdfSummary(
+      workshopId,
+      pdfBase64,
+    );
     this.logger.log(`Summary PDF job ${job.id} done (ready)`);
     return result;
   }

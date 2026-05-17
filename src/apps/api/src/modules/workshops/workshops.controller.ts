@@ -11,11 +11,14 @@ import {
   Patch,
   Post,
   Query,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
   UsePipes,
   ValidationPipe,
 } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
+import { FileInterceptor } from '@nestjs/platform-express';
 import type {
   PaginatedResponse,
   Workshop,
@@ -25,7 +28,12 @@ import type {
   WorkshopSummaryQueuedResponse,
 } from '@unihub/types';
 import type { Queue } from 'bullmq';
-import { WORKSHOP_SUMMARY_QUEUE, WORKSHOP_STATUSES } from '../../constant';
+import multer from 'multer';
+import {
+  WORKSHOP_SUMMARY_MAX_PDF_BYTES,
+  WORKSHOP_SUMMARY_QUEUE,
+  WORKSHOP_STATUSES,
+} from '../../constant';
 import type { WorkshopSummaryJobPayload } from './workshop-summary';
 import type { WorkshopSummaryJobDone } from './workshop-summary.service';
 import { parsePositiveInt } from '../../utils/parse-positive-int';
@@ -136,10 +144,24 @@ export class WorkshopsController {
   @HttpCode(HttpStatus.OK)
   @UseGuards(AuthGuard, RolesGuard)
   @Roles('admin', 'organizer')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: multer.memoryStorage(),
+      limits: { fileSize: WORKSHOP_SUMMARY_MAX_PDF_BYTES },
+    }),
+  )
   async triggerSummary(
     @Param('id') id: string,
+    @UploadedFile() file: { buffer: Buffer } | undefined,
   ): Promise<WorkshopSummaryQueuedResponse> {
-    return await this.workshopSummary.enqueuePdfSummary(id);
+    const buf = file?.buffer;
+    if (!buf?.length) {
+      throw new BadRequestException({
+        code: 'pdf_required',
+        message: 'Vui lòng gửi file PDF (multipart, field "file").',
+      });
+    }
+    return await this.workshopSummary.enqueuePdfSummary(id, buf);
   }
 
   @Get('summary-jobs/:jobId')
