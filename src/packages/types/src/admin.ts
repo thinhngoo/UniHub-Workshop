@@ -30,6 +30,39 @@ export interface AdminDashboardRecentRegistration {
   workshopTitle: string;
 }
 
+export interface StudentSyncIssue {
+  line: number | null;
+  code: string;
+  message: string;
+}
+
+export interface StudentSyncReport {
+  imported: number;
+  skippedRows: number;
+  duplicateIdsSuperseded: number;
+  issues: StudentSyncIssue[];
+}
+
+export interface StudentSyncQueuedResponse {
+  jobId: string;
+}
+
+export type StudentSyncJobState =
+  | 'waiting'
+  | 'active'
+  | 'completed'
+  | 'failed'
+  | 'delayed'
+  | 'paused'
+  | 'unknown';
+
+export interface StudentSyncJobStatusResponse {
+  jobId: string;
+  state: StudentSyncJobState;
+  report?: StudentSyncReport;
+  failedReason?: string;
+}
+
 export interface AdminDashboardSummary {
   generatedAt: ISODateString;
 

@@ -315,12 +315,9 @@ export function WorkshopFormPage({ mode }: Props) {
           >
             <DialogContent className="max-w-md border-red-100">
               <DialogHeader>
-                <DialogTitle className="text-red-900">Xóa workshop này?</DialogTitle>
-                <DialogDescription className="text-red-950/70">
-                  Workshop{' '}
-                  <span className="font-medium text-red-900">
-                    «{existingQuery.data?.title ?? '…'}»
-                  </span>{' '}
+                <DialogTitle>Xóa workshop này?</DialogTitle>
+                <DialogDescription>
+                  Workshop <span className="font-semibold">«{existingQuery.data?.title ?? '…'}»</span>{' '}
                   sẽ bị xóa vĩnh viễn. Thao tác này không thể hoàn tác.
                 </DialogDescription>
               </DialogHeader>

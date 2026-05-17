@@ -20,7 +20,7 @@ Quy trình hiện tại dựa trên Google Form + email thủ công có nhiều 
 - **Không hỗ trợ thanh toán tích hợp**: Workshop có phí phải xử lý thủ công hoàn toàn bên ngoài, dễ xảy ra sai sót.
 - **Không có check-in kỹ thuật số**: Nhân sự phải đối chiếu danh sách in giấy — chậm, dễ nhầm, và hoàn toàn không thể xác nhận trên hệ thống ở khu vực mất mạng.
 - **Thông báo thủ công**: Email xác nhận phải gửi bằng tay, và cũng phải thủ công để mở rộng sang kênh khác (app, Telegram…) khi có nhu cầu.
-- **Không tích hợp được dữ liệu sinh viên**: Hệ thống quản lý sinh viên hiện tại của trường không có API; dữ liệu chỉ được export dưới dạng CSV vào ban đêm, nên không thể xác thực sinh viên tự động tại thời điểm đăng ký.
+- **Không tích hợp được dữ liệu sinh viên**: Hệ thống quản lý sinh viên hiện tại của trường không có API; dữ liệu chỉ được export dưới dạng CSV vào ban đêm, nên phải cập nhập thủ công từ CSV.
 
 **Hậu quả:** mỗi mùa sự kiện, ban tổ chức phải xử lý thủ công hàng trăm trường hợp đăng ký trùng, tranh chấp chỗ ngồi, thanh toán không khớp và check-in nhầm người. Chi phí vận hành và tỉ lệ sai sót đều tăng theo quy mô.
 

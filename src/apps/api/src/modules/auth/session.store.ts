@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { SESSION_REDIS_KEY_PREFIX, SESSION_TTL_SEC } from '../../constant';
-import { RedisService } from '../redis/redis.service';
+import { RedisService } from '../database/redis.service';
 
 @Injectable()
 export class SessionStore {

@@ -1,5 +1,12 @@
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { CalendarDays, LayoutDashboard, ListChecks, LogOut, ShieldAlert } from 'lucide-react';
+import {
+  CalendarDays,
+  FileUp,
+  LayoutDashboard,
+  ListChecks,
+  LogOut,
+  ShieldAlert,
+} from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
@@ -16,6 +23,7 @@ const mobileNavItem = ({ isActive }: { isActive: boolean }) =>
 
 export function AdminLayout() {
   const { user, hasAdminAccess, clear, isReady } = useAuth();
+  const isAdminUser = user?.role === 'admin';
   const navigate = useNavigate();
 
   const handleLogout = () => {
@@ -82,6 +90,12 @@ export function AdminLayout() {
             <ListChecks className="h-4 w-4" />
             Đăng ký
           </NavLink>
+          {isAdminUser && (
+            <NavLink to="/student-sync" className={navItem}>
+              <FileUp className="h-4 w-4" />
+              Đồng bộ sinh viên
+            </NavLink>
+          )}
         </nav>
 
         <div className="border-t border-slate-100 p-3">
@@ -124,6 +138,12 @@ export function AdminLayout() {
               <ListChecks className="size-4 shrink-0" />
               Đăng ký
             </NavLink>
+            {isAdminUser && (
+              <NavLink to="/student-sync" className={mobileNavItem}>
+                <FileUp className="size-4 shrink-0" />
+                <span className="truncate">Đồng bộ</span>
+              </NavLink>
+            )}
           </nav>
         </header>
 

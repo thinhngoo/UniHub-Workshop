@@ -6,6 +6,7 @@ import { DashboardPage } from '@/pages/DashboardPage';
 import { WorkshopsPage } from '@/pages/WorkshopsPage';
 import { WorkshopFormPage } from '@/pages/WorkshopFormPage';
 import { RegistrationsPage } from '@/pages/RegistrationsPage';
+import { StudentSyncPage } from '@/pages/StudentSyncPage';
 import { NotFoundPage } from '@/pages/NotFoundPage';
 
 export const router = createBrowserRouter([
@@ -23,6 +24,7 @@ export const router = createBrowserRouter([
       { path: 'workshops/new', element: <WorkshopFormPage mode="create" /> },
       { path: 'workshops/:id/edit', element: <WorkshopFormPage mode="edit" /> },
       { path: 'registrations', element: <RegistrationsPage /> },
+      { path: 'student-sync', element: <StudentSyncPage /> },
       { path: '*', element: <NotFoundPage /> },
     ],
   },

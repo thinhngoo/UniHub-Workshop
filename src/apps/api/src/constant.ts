@@ -23,3 +23,7 @@ export const JWT_REFRESH_EXPIRES_IN = '30d';
 
 export const SESSION_REDIS_KEY_PREFIX = 'session:';
 export const REDIS_DEFAULT_URL = 'redis://127.0.0.1:6379';
+
+export const STUDENT_SYNC_QUEUE = 'student-sync';
+export const STUDENT_SYNC_JOB_NAME = 'run';
+export const STUDENT_SYNC_MAX_FILE_BYTES = 10 * 1024 * 1024; // 10MB

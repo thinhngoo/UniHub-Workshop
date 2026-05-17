@@ -10,6 +10,7 @@
 | ----------------- | --------------------------------------------------------------------------------- |
 | `auth`            | Xác thực, kiểm tra role (RBAC)                                                    |
 | `workshop`        | CRUD workshop, quản lý số chỗ                                                     |
+| `student-sync`    | Import CSV hằng đêm từ hệ thống sinh viên cũ                                      |
 
 ### C4 Diagram
 
