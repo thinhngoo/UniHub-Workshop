@@ -28,7 +28,7 @@ Người dùng đăng nhập bằng **email + mật khẩu** với trường **`
 ### Bootstrap — lấy thông tin phiên
 
 1. Client gọi `GET /auth/me/[method]` kèm token lưu trong cookie / authorization header.
-2. Server verify và trả về thông tin. 
+2. Server verify và trả về thông tin.
 
 ### Refresh JWT
 
@@ -51,13 +51,3 @@ Người dùng đăng nhập bằng **email + mật khẩu** với trường **`
 
 - **Bảo mật**: Cookie httpOnly; `Secure`. JWT ký **HS256**, secret từ env `JWT_SECRET`.
 - **TTL**: Access ngắn; refresh và session Redis ~ 30 ngày (`constant.ts`).
-
-## Tiêu chí chấp nhận
-
-- [ ] `POST /auth/login/jwt` trả `user` + `accessToken`, cookie refresh được set; sai mật khẩu → 401 `invalid_credentials`.
-- [ ] `POST /auth/login/session` trả `user` + `sessionId`, cookie session được set; session có trong Redis đến khi TTL.
-- [ ] `GET /auth/me/session` với cookie hoặc Authorization trả đúng user khi session còn hiệu lực; session xoá hoặc hết hạn → 401.
-- [ ] `GET /auth/me/jwt` và `POST /auth/refresh` làm mới access khi refresh hợp lệ.
-- [ ] `POST /auth/logout` trả 204, cookie auth bị xoá, session Redis (nếu có) bị xoá.
-- [ ] User `organizer` không đăng nhập được với `client: 'staff'` và ngược lại; `admin` đăng nhập mọi `client`.
-- [ ] Validation body: email không hợp lệ / thiếu password / `client` không thuộc enum → 400 `invalid_request`.

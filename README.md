@@ -1,6 +1,53 @@
-# Environment
+# UniHub Workshop
 
-## Client
+## Cài đặt
+
+### Yêu cầu
+
+- **Node.js** ≥ 20, **pnpm** ≥ 10 (khuyến nghị đúng `packageManager` trong `src/package.json`)
+- **PostgreSQL** — chuỗi kết nối đặt ở `DATABASE_URL`
+- **Redis** — khuyến nghị chạy local (mặc định `redis://127.0.0.1:6379` nếu không set `REDIS_URL`)
+
+### 1. Cài dependency và Prisma Client
+
+```bash
+cd src
+pnpm setup
+```
+
+(Lệnh tương đương: `pnpm install` + `pnpm prisma:generate`.)
+
+### 2. Cấu hình API
+
+Copy file môi trường của API và chỉnh giá trị tối thiểu (ít nhất `DATABASE_URL`, `JWT_SECRET`; `REDIS_URL` nếu Redis không phải mặc định):
+
+```bash
+copy apps\api\.env.example apps\api\.env    # Windows (cmd)
+# hoặc: cp apps/api/.env.example apps/api/.env   # Git Bash / macOS / Linux
+```
+
+### 3. Khởi tạo schema và dữ liệu mẫu
+
+Project dùng file SQL trong thư mục `migrations/`. Áp vào đúng database trong `DATABASE_URL`, **theo thứ tự**:
+
+`001_user.sql` → `002_workshop.sql` → `003_registration.sql` → `004_payment.sql` → `005_checkin.sql` → `006_notification.sql` → `000_seed_data.sql`.
+
+### 4. Chạy ứng dụng
+
+Tất cả lệnh dưới đây thực hiện trong thư mục `src/`:
+
+| Script             | Ý nghĩa                         |
+| ------------------ | ------------------------------- |
+| `pnpm dev:api`     | API Nest (`PORT` mặc định 3000) |
+| `pnpm dev:sv`      | Web sinh viên (Vite)            |
+| `pnpm dev:admin`   | Web admin (Vite)                |
+| `pnpm dev:checkin` | Mobile check-in (Expo)          |
+
+---
+
+## Environment
+
+### Client
 
 **web-sv & web-admin**
 
@@ -11,7 +58,7 @@
 - `EXPO_PUBLIC_API_URL` (optional): URL gốc API backend (không dấu `/` cuối); có fallback từ `app.config` / host Expo khi trống.
 - `QR_TOKEN_PREFIX="qrtok_"` (optional): Tiền tố chuỗi token trong mã QR check-in (phải khớp backend); có giá trị mặc định trong `app.config` khi trống.
 
-## Server
+### Server
 
 **API**
 

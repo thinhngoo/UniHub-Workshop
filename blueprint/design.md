@@ -159,9 +159,9 @@ flowchart LR
 
 ---
 
-## Thiết kế cơ sở dữ liệu
+## 3. Thiết kế cơ sở dữ liệu
 
-### Lựa chọn loại database
+### 3.1. Lựa chọn loại database
 
 Dùng **Relational DB (SQL)** làm kho dữ liệu chính, kết hợp với **key-value store** cho dữ liệu tạm thời.
 
@@ -170,7 +170,7 @@ Dùng **Relational DB (SQL)** làm kho dữ liệu chính, kết hợp với **k
 | User, Workshop, Registration, Payment, Check-in, Notification                                | **Relational DB**  | Cần ACID cho nghiệp vụ giữ chỗ và thanh toán; quan hệ giữa các entity rõ ràng; query thống kê |
 | Rate-limit counter, Idempotency key, Circuit breaker state, Session cache, Queue information | **KV / in-memory** | Truy cập nhiều, TTL ngắn, không cần bền vững tuyệt đối                                        |
 
-### Sơ đồ quan hệ (ER)
+### 3.2. Sơ đồ quan hệ (ER)
 
 ```mermaid
 erDiagram
@@ -261,9 +261,9 @@ erDiagram
 
 ---
 
-## Thiết kế kiểm soát truy cập
+## 4. Thiết kế kiểm soát truy cập
 
-### Xác thực
+### 4.1. Xác thực
 
 Backend dùng `AuthGuard`: đọc **Bearer JWT** (`Authorization`) hoặc **session id** (cookie/header tùy client), gọi `AuthService.me`, rồi gắn `req.user` (kèm `role`) cho request hiện tại. Thất bại → **401** (`unauthenticated`).
 
@@ -272,7 +272,7 @@ Triển khai client:
 - Web admin / nhân sự (mobile) — session.
 - Sinh viên (web) — JWT.
 
-### Ủy quyền RBAC
+### 4.2. Ủy quyền RBAC
 
 **Triển khai tại API**, UX hỗ trợ hiển thị.
 
@@ -297,11 +297,11 @@ Luồng trong `RolesGuard`:
 
 ---
 
-## Thiết kế các cơ chế bảo vệ hệ thống
+## 5. Thiết kế các cơ chế bảo vệ hệ thống
 
-### Kiểm soát tải đột biến
+### 5.1. Kiểm soát tải đột biến
 
-#### Giải pháp triển khai
+#### 5.1.1. Giải pháp triển khai
 
 **Chiến lược nhiều lớp**:
 
@@ -317,24 +317,24 @@ Không caching workshop (high read) do dữ liệu có thay đổi trong thời 
 
 Rate limit **theo IP** phù hợp trong kịch bản trường học.
 
-#### Hành vi khi vượt ngưỡng
+#### 5.1.2. Hành vi khi vượt ngưỡng
 
 Framework trả **HTTP 429** (Too Many Requests); client backoff / retry có jitter.
 
-#### Giới hạn thiết kế & hướng mở rộng
+#### 5.1.3. Giới hạn thiết kế & hướng mở rộng
 
 Storage mặc định của `@nestjs/throttler` là **in-memory trong process**: để đếm **chung giữa các instance** nếu hệ thống phân tán, có thể chuyển sang storage Redis.
 
-### Xử lý cổng thanh toán không ổn định
+### 5.2. Xử lý cổng thanh toán không ổn định
 
-#### Giải pháp triển khai
+#### 5.2.1. Giải pháp triển khai
 
 | Thành phần               | Vai trò                                                                                                                       |
 | ------------------------ | ----------------------------------------------------------------------------------------------------------------------------- |
 | **Circuit breaker (CB)** | Theo dõi lỗi hạ tầng. Khi vượt ngưỡng → tạm **ngưng initiate** checkout (`POST /payments`) trong một khoảng thời gian.        |
 | **Graceful degradation** | Khi CB chặn: trả **HTTP 200** kèm payload “giảm chức năng” (`degraded`, `retryAfterSeconds`, `userMessage`) thay vì lỗi cứng. |
 
-#### Các trạng thái CB
+#### 5.2.2. Các trạng thái CB
 
 | Trạng thái    | Ý nghĩa                                                                                                                                                                              | Chuyển trạng thái                                                                                 |
 | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------- |
@@ -342,9 +342,9 @@ Storage mặc định của `@nestjs/throttler` là **in-memory trong process**:
 | **Open**      | Trong `PAYMENT_GATEWAY_CB_RESET_MS` kể từ mở, initiate bị graceful hoặc **503**.                                                                                                     | Hết cooldown → request đầu tiên đưa vào **Half-open** (ghi state Redis) và cho phép thử initiate. |
 | **Half-open** | Cho phép thử lại luồng initiate (probe + checkout). **Thành công** checkout (finalize / webhook OK) → **Closed** đầy đủ. **Lỗi hạ tầng** tiếp → **Open** lại (đặt `openedAtMs` mới). |                                                                                                   |
 
-### Chống trừ tiền hai lần
+### 5.3. Chống trừ tiền hai lần
 
-#### Giải pháp triển khai
+#### 5.3.1. Giải pháp triển khai
 
 | Lớp                                       | Nhiệm vụ                                                                                                                                                                                                       |
 | ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -352,12 +352,12 @@ Storage mặc định của `@nestjs/throttler` là **in-memory trong process**:
 | **Replay** (Redis)                        | Cùng `(userId, Idempotency-Key)` và snapshot còn TTL → trả cùng redirect hoặc **succeeded đọc từ Postgres** — không cộng `attemptCount` hay tạo checkout mới; luôn đọc lại row `payments` khớp `registration`. |
 | **Registration** (Database)               | Workshop có phí: cột `idempotency_key` UNIQUE global trong DB khi tạo payment lúc đăng ký — tách luồng **chống hai bản đăng ký hai payment** khỏi luồng **replay initiate**.                            |
 
-#### TTL
+#### 5.3.2. TTL
 
 - `PAYMENT_INIT_IDEMPOTENCY_TTL_SECONDS`: mặc định **86400** giây.
 - Có `expires_at` giữ chỗ: TTL tính = `min(env, max(300, giây còn đến hết chỗ + 120 đệm))`.
 
-#### Luồng xử lý khi phát hiện trùng lặp
+#### 5.3.3. Luồng xử lý khi phát hiện trùng lặp
 
 `PaymentsService.initiateStudentPayment`:
 
@@ -384,7 +384,7 @@ Lưu ý: snapshot Redis **không** thay thế bản ghi `payments`; replay luôn
 
 ---
 
-## Các quyết định kỹ thuật
+## 6. Các quyết định kỹ thuật
 
 **Web App (Sinh viên + Admin) → React + Vite + TypeScript**:
 
