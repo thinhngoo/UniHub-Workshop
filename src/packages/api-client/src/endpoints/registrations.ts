@@ -16,7 +16,6 @@ export const registrationsApi = (http: AxiosInstance) => ({
         headers: withIdempotencyKey({}, idempotencyKey),
       })
       .then((r) => r.data),
-  cancel: (id: UUID) => http.post<Registration>(`/registrations/${id}/cancel`).then((r) => r.data),
   getPaymentForRegistration: (registrationId: UUID) =>
     http.get<Payment>(`/registrations/${registrationId}/payment`).then((r) => r.data),
   getQr: (id: UUID) =>

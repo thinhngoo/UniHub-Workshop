@@ -1,5 +1,5 @@
 import type { AxiosInstance } from 'axios';
-import type { JwtLoginResponse, LoginRequest, SessionLoginResponse, User } from '@unihub/types';
+import type { JwtLoginResponse, LoginRequest, SessionLoginResponse } from '@unihub/types';
 
 export const authApi = (http: AxiosInstance) => ({
   loginJwt: (body: LoginRequest) =>
@@ -9,11 +9,4 @@ export const authApi = (http: AxiosInstance) => ({
   logout: () => http.post<void>('/auth/logout').then((r) => r.data),
   meJwt: () => http.get<JwtLoginResponse>('/auth/me/jwt').then((r) => r.data),
   meSession: () => http.get<SessionLoginResponse>('/auth/me/session').then((r) => r.data),
-  me: () => http.get<User>('/auth/me').then((r) => r.data),
-  refresh: (refreshToken?: string) =>
-    http
-      .post<
-        JwtLoginResponse | SessionLoginResponse
-      >('/auth/refresh', refreshToken ? { refreshToken } : {})
-      .then((r) => r.data),
 });

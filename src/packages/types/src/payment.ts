@@ -23,7 +23,7 @@ export interface InitiatePaymentRequest {
 export interface InitiatePaymentResponse {
   payment: Payment;
   redirectUrl: string | null;
-  /** HTTP 200 — graceful degradation khi circuit breaker / health cổng chặn initiate */
+  /** HTTP 200 — graceful degradation khi circuit breaker chặn initiate */
   degraded?: boolean;
   retryAfterSeconds?: number;
   userMessage?: string;

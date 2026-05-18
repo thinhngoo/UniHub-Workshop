@@ -1,6 +1,5 @@
 /**
- * Generate a UUIDv4 for each user "intent" (e.g. one click of "Pay") and reuse
- * it across all retries of that intent so the server can dedupe.
+ * Generate a UUIDv4 for each user "intent".
  */
 interface CryptoLike {
   randomUUID?: () => string;
