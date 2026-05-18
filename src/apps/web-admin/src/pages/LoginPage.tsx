@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
 import { Eye, EyeOff } from 'lucide-react';
 import { ApiError } from '@unihub/api-client';
 import { Button } from '@/components/ui/button';
@@ -20,8 +20,7 @@ type FormValues = z.infer<typeof schema>;
 
 export function LoginPage() {
   const navigate = useNavigate();
-  const location = useLocation();
-  const { signIn } = useAuth();
+  const { signIn, isReady, isAuthenticated } = useAuth();
   const [serverError, setServerError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
 
@@ -34,6 +33,18 @@ export function LoginPage() {
     defaultValues: { email: 'organizer@gmail.com', password: '1234567' },
   });
 
+  if (!isReady) {
+    return (
+      <div className="min-h-screen flex items-center justify-center text-sm text-slate-500">
+        Đang tải phiên đăng nhập…
+      </div>
+    );
+  }
+
+  if (isAuthenticated) {
+    return <Navigate to="/" replace />;
+  }
+
   const onSubmit = async (values: FormValues) => {
     setServerError(null);
     try {
@@ -42,8 +53,7 @@ export function LoginPage() {
         client: 'organizer',
       });
       signIn(res);
-      const from = (location.state as { from?: { pathname: string } } | null)?.from?.pathname;
-      navigate(from ?? '/', { replace: true });
+      navigate('/', { replace: true });
     } catch (e) {
       if (e instanceof ApiError) setServerError(e.message);
       else setServerError('Không thể đăng nhập.');

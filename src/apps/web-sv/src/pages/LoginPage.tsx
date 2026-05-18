@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useNavigate, useLocation, Link } from 'react-router-dom';
+import { Navigate, useNavigate, useLocation, Link } from 'react-router-dom';
 import { Eye, EyeOff } from 'lucide-react';
 import { ApiError } from '@unihub/api-client';
 import { Button } from '@/components/ui/button';
@@ -21,7 +21,7 @@ type FormValues = z.infer<typeof schema>;
 export function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { signIn } = useAuth();
+  const { signIn, isReady, isAuthenticated } = useAuth();
   const [serverError, setServerError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
 
@@ -33,6 +33,16 @@ export function LoginPage() {
     resolver: zodResolver(schema),
     defaultValues: { email: '', password: '' },
   });
+
+  if (!isReady) {
+    return (
+      <div className="py-16 text-center text-sm text-slate-500">Đang tải phiên đăng nhập…</div>
+    );
+  }
+
+  if (isAuthenticated) {
+    return <Navigate to="/" replace />;
+  }
 
   const onSubmit = async (values: FormValues) => {
     setServerError(null);
