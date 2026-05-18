@@ -12,6 +12,7 @@ import {
   WORKSHOP_SUMMARY_MAX_PDF_BYTES,
   WORKSHOP_SUMMARY_QUEUE,
 } from '../../constant';
+import { MockAiSummaryService } from '../../mock/ai/mock-ai-summary.service';
 import { WorkshopsRepository } from '../database/repository/workshops.repository';
 import { bufferLooksLikePdf, extractPdfPlainText } from './extract-pdf-text';
 import type { WorkshopSummaryJobPayload } from './workshop-summary';
@@ -27,6 +28,7 @@ export class WorkshopSummaryService {
 
   constructor(
     private readonly workshopsRepo: WorkshopsRepository,
+    private readonly mockAiSummary: MockAiSummaryService,
     @InjectQueue(WORKSHOP_SUMMARY_QUEUE)
     private readonly summaryQueue: Queue,
   ) {}
@@ -124,9 +126,11 @@ export class WorkshopSummaryService {
       throw new Error('Không trích xuất được văn bản từ PDF.');
     }
 
+    const { summary } = this.mockAiSummary.summarize(trimmed);
+
     const saved = await this.workshopsRepo.applySummaryFromPdfText(
       workshopId,
-      trimmed,
+      summary,
       'ready',
     );
     if (!saved) {

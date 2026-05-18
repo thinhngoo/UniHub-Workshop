@@ -1,5 +1,6 @@
 import { BullModule } from '@nestjs/bullmq';
 import { Module } from '@nestjs/common';
+import { MockAiModule } from '../../mock/ai/mock-ai.module';
 import { WORKSHOP_SUMMARY_QUEUE } from '../../constant';
 import { AuthModule } from '../auth/auth.module';
 import { DatabaseModule } from '../database/database.module';
@@ -10,6 +11,7 @@ import { WorkshopsService } from './workshops.service';
 
 @Module({
   imports: [
+    MockAiModule,
     DatabaseModule,
     AuthModule,
     BullModule.registerQueue({
