@@ -1,5 +1,27 @@
 # Đặc tả: Check-in (Check-in)
+1. Pre-fetch (TODO) danh sách workshop + đăng ký được phân công khi còn mạng.
+2. Quét QR → verify chữ ký HMAC cục bộ (mock: check prefix `qrtok_` — xem `src/lib/qr.ts`) → ghi vào outbox SQLite (`src/lib/outbox.ts`).
+3. Online lại → tab **Hàng đợi** gọi `POST /checkin/batch` với `Idempotency-Key` (xem `@unihub/api-client`).
+4. Server dedupe theo `(workshop_id, student_id, client_event_id)` và trả về `accepted | duplicate | invalid_qr | not_registered | cancelled` cho từng item — UI cập nhật theo.
 
+
+### Tài khoản và QR token để thử
+
+Server seed sẵn các registration confirmed (xem `apps/api/src/registrations/registrations.service.ts`). Một vài QR token hợp lệ để paste vào generator QR (hoặc hiển thị qua web-sv `/me/registrations/.../qr`):
+
+- `qrtok_confirmed_workshop_a_student`
+- `qrtok_a_1`, `qrtok_a_2`, … `qrtok_a_26`
+- `qrtok_c_1` … `qrtok_c_134`
+- `qrtok_interview_1` … `qrtok_interview_36`
+
+Quét lần 2 cùng token → server trả `duplicate`. Token sai định dạng (không bắt đầu bằng `qrtok_`) bị app từ chối ngay trên client.
+
+## Những điểm còn TBD (ngoài phạm vi mock)
+
+- HMAC verify QR cục bộ với secret cấp theo ca trực (ADR-9). Hiện chỉ verify prefix.
+- Pre-fetch danh sách registration được phân công theo workshop, để app có thể hiện tên sinh viên ngay sau khi quét — tab Hàng đợi hiện chỉ hiện token.
+- Đồng bộ tự động khi mạng quay lại (sử dụng `@react-native-community/netinfo` + retry queue).
+- WatermelonDB nếu cần truy vấn outbox phức tạp hơn (hiện expo-sqlite + index là đủ).
 ## Mô tả
 
 Nhân sự (`staff` / `admin`) dùng **mobile app** quét QR code của sinh viên tại cửa workshop. Mỗi lần quét sinh ra một **sự kiện check-in** với `clientEventId` (UUID v4 do mobile cấp) — cho phép **gom batch**, **xử lý lại** khi mất mạng (idempotent), và phát hiện **trùng**:

@@ -23,6 +23,50 @@ export class ApiError extends Error {
   }
 }
 
+function pickMessage(raw: unknown, fallback: string): string {
+  if (typeof raw === 'string') {
+    const t = raw.trim();
+    if (t.length > 0) return t;
+    return fallback;
+  }
+  if (Array.isArray(raw)) {
+    const s = raw
+      .map(String)
+      .join(' ')
+      .trim();
+    if (s.length > 0) return s;
+    return fallback;
+  }
+  return fallback;
+}
+
+function apiErrorBodyFromResponse(data: unknown, fallbackMessage: string): ApiErrorBody {
+  if (!data || typeof data !== 'object') {
+    return { code: 'unknown_error', message: fallbackMessage };
+  }
+  const raw = data as Record<string, unknown>;
+  const code = typeof raw.code === 'string' ? raw.code : 'unknown_error';
+  const message = pickMessage(raw.message, fallbackMessage);
+
+  const merged: Record<string, unknown> = {};
+  const nested = raw.details;
+  if (typeof nested === 'object' && nested !== null && !Array.isArray(nested)) {
+    Object.assign(merged, nested as Record<string, unknown>);
+  }
+
+  const reserved = new Set(['code', 'message', 'details', 'statusCode', 'error']);
+  for (const [k, v] of Object.entries(raw)) {
+    if (reserved.has(k)) continue;
+    if (!(k in merged)) merged[k] = v;
+  }
+
+  return {
+    code,
+    message,
+    details: Object.keys(merged).length ? merged : undefined,
+  };
+}
+
 export function createApiClient(options: CreateApiClientOptions): AxiosInstance {
   const { baseURL, withCredentials, onUnauthorized, defaultHeaders, refreshAccessToken } = options;
 
@@ -58,12 +102,9 @@ export function createApiClient(options: CreateApiClientOptions): AxiosInstance 
       }
 
       if (error.response?.data) {
-        const body = error.response.data;
-        const apiError = new ApiError(error.response.status, {
-          code: body.code ?? 'unknown_error',
-          message: body.message ?? error.message,
-          details: body.details,
-        });
+        const status = error.response.status;
+        const body = apiErrorBodyFromResponse(error.response.data, error.message);
+        const apiError = new ApiError(status, body);
         return Promise.reject(apiError);
       }
       return Promise.reject(error);

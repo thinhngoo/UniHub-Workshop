@@ -4,6 +4,9 @@
   "private": true,
   "description": "UniHub Workshop monorepo",
   "scripts": {
+    "install:all": "pnpm install",
+    "prisma:generate": "pnpm --filter @unihub/api run prisma:generate",
+    "setup": "pnpm install && pnpm run prisma:generate",
     "dev:sv": "pnpm --filter @unihub/web-sv dev",
     "dev:admin": "pnpm --filter @unihub/web-admin dev",
     "dev:api": "pnpm --filter @unihub/api start:dev",

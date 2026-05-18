@@ -17,12 +17,37 @@ const PAYMENT_LABEL: Record<string, string> = {
   refunded: 'Đã hoàn tiền',
 };
 
+function retryAfterFromUnknown(v: unknown): number | undefined {
+  const n = Number(v);
+  return Number.isFinite(n) && n > 0 ? Math.ceil(n) : undefined;
+}
+
+function nonEmptyText(v: unknown): string | undefined {
+  if (typeof v !== 'string') return undefined;
+  const t = v.trim();
+  return t.length > 0 ? t : undefined;
+}
+
+type CircuitPaymentNotice =
+  | {
+      variant: 'graceful';
+      message: string;
+      retryAfterSeconds?: number;
+    }
+  | {
+      variant: 'block';
+      message: string;
+      retryAfterSeconds?: number;
+      code?: string;
+    };
+
 export function RegistrationPaymentPage() {
   const { id: registrationId } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const qc = useQueryClient();
 
   const [payError, setPayError] = useState<string | null>(null);
+  const [circuitNotice, setCircuitNotice] = useState<CircuitPaymentNotice | null>(null);
   const [idempotencyKey] = useState(() => generateIdempotencyKey());
 
   useEffect(() => {
@@ -40,6 +65,7 @@ export function RegistrationPaymentPage() {
     }
 
     if (ps === 'failed') {
+      setCircuitNotice(null);
       setPayError(
         'Thanh toán không thành công hoặc đã hủy. Bạn có thể thử lại (giữ chỗ vẫn còn hiệu lực nếu chưa hết hạn).',
       );
@@ -70,12 +96,19 @@ export function RegistrationPaymentPage() {
       qc.invalidateQueries({ queryKey: ['my-registrations'] });
 
       if (data.degraded) {
-        setPayError(
-          data.userMessage ??
-            `Hệ thống thanh toán đang quá tải hoặc tạm ngưng. Vui lòng thử lại sau khoảng ${data.retryAfterSeconds ?? 60} giây (giữ chỗ vẫn có hiệu lực trong thời gian quy định).`,
-        );
+        setPayError(null);
+        const retry = retryAfterFromUnknown(data.retryAfterSeconds) ?? retryAfterFromUnknown(60);
+        const fallback = `Hệ thống thanh toán đang quá tải hoặc tạm ngưng. Vui lòng thử lại sau khoảng ${retry} giây (giữ chỗ vẫn có hiệu lực trong thời gian quy định).`;
+        setCircuitNotice({
+          variant: 'graceful',
+          message: nonEmptyText(data.userMessage) ?? fallback,
+          retryAfterSeconds: retry,
+        });
         return;
       }
+
+      setCircuitNotice(null);
+      setPayError(null);
 
       if (data.redirectUrl) {
         window.location.href = data.redirectUrl;
@@ -85,6 +118,21 @@ export function RegistrationPaymentPage() {
       void navigate(`/me/registrations/${registrationId}/qr`, { replace: true });
     },
     onError: (e: unknown) => {
+      if (e instanceof ApiError && e.status === 503) {
+        const retry = retryAfterFromUnknown(e.details?.retryAfterSeconds);
+        setPayError(null);
+        const fallback503 =
+          'Cổng thanh toán không chấp nhận khởi tạo lúc này. Giữ chỗ vẫn có hiệu lực nếu chưa hết hạn — vui lòng thử lại sau.';
+        const msg = nonEmptyText(e.message) ?? nonEmptyText(e.details?.userMessage) ?? fallback503;
+        setCircuitNotice({
+          variant: 'block',
+          message: msg,
+          retryAfterSeconds: retry,
+          code: e.code !== 'unknown_error' ? e.code : undefined,
+        });
+        return;
+      }
+      setCircuitNotice(null);
       if (e instanceof ApiError) setPayError(e.message);
       else setPayError('Không thực hiện được thanh toán. Vui lòng thử lại.');
     },
@@ -92,6 +140,7 @@ export function RegistrationPaymentPage() {
 
   const pay = () => {
     setPayError(null);
+    setCircuitNotice(null);
     payMutation.mutate();
   };
 
@@ -150,6 +199,37 @@ export function RegistrationPaymentPage() {
                   <p className="text-sm text-slate-600">
                     Nhấn nút bên dưới để xác nhận và kích hoạt mã QR check-in.
                   </p>
+                  {circuitNotice?.variant === 'graceful' ? (
+                    <div
+                      role="alert"
+                      className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950"
+                    >
+                      <p className="font-medium text-amber-900">Hệ thống thanh toán đang quá tải</p>
+                      {circuitNotice.retryAfterSeconds ? (
+                        <p className="mt-2 text-xs text-amber-800/90 tabular-nums">
+                          Vui lòng thử lại sau khoảng:{' '}
+                          <strong>{circuitNotice.retryAfterSeconds}s</strong>
+                        </p>
+                      ) : null}
+                    </div>
+                  ) : null}
+
+                  {circuitNotice?.variant === 'block' ? (
+                    <div
+                      role="alert"
+                      className="rounded-md border border-orange-300 bg-orange-50 p-3 text-sm text-orange-950"
+                    >
+                      <p className="font-medium text-orange-900">
+                        Hệ thống thanh toán không khả dụng
+                      </p>
+                      {circuitNotice.retryAfterSeconds ? (
+                        <p className="mt-2 text-xs text-orange-900/90 tabular-nums">
+                          Retry sau khoảng: <strong>{circuitNotice.retryAfterSeconds}s</strong>
+                        </p>
+                      ) : null}
+                    </div>
+                  ) : null}
+
                   {payError ? (
                     <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
                       {payError}

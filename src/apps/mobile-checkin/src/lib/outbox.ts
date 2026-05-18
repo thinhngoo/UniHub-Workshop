@@ -2,7 +2,7 @@ import * as SQLite from 'expo-sqlite';
 import type { CheckInBatchItemStatus } from '@unihub/types';
 
 /**
- * Offline check-in outbox (design.md §3.1).
+ * Offline check-in outbox.
  *
  *   1. Scanner inserts a row with status='pending' immediately on a valid QR.
  *   2. When the device is online, the queue screen reads all pending rows,

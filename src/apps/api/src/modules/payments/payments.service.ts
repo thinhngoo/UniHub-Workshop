@@ -35,6 +35,7 @@ import {
   type PaymentInitiateIdempotencyPayload,
 } from './payment-initiate-idempotency.service';
 import { ReservationHoldQueueService } from '../registrations/reservation-hold.queue';
+import { devPaymentChaosEnabled } from './payment-dev-env';
 
 type PaymentWithRelations = DbPayment & {
   registration: DbRegistration & { workshop: DbWorkshop | null };
@@ -44,6 +45,14 @@ function useMockPaymentGatewayRedirect(): boolean {
   const v = process.env.USE_MOCK_PAYMENT_GATEWAY?.toLowerCase();
   return v === '1' || v === 'true';
 }
+
+const DEV_WEBHOOK_CHAOS_REASONS: readonly string[] = [
+  '[DEV chaos] Webhook success bị chặn (timeout giả lập).',
+  '[DEV chaos] Webhook success bị chặn (PSP từ chối).',
+  '[DEV chaos] Webhook success bị chặn (số dư / hạn mức).',
+  '[DEV chaos] Webhook success bị chặn (lỗi xác thực 3DS).',
+  '[DEV chaos] Webhook success bị chặn (duplicate intent).',
+];
 
 @Injectable()
 export class PaymentsService {
@@ -183,6 +192,86 @@ export class PaymentsService {
       },
       HttpStatus.SERVICE_UNAVAILABLE,
     );
+  }
+
+  /**
+   * Gây lỗi thanh toán ngẫu nhiên (timeout, từ chối, v.v.).
+   * Mọi nhánh đều kết thúc lỗi hoặc lưu `failed`; không có nhánh đi tiếp tới cổng thật / mock trong dev chaos.
+   */
+  private async devPaymentChaosMaybeThrowOnInitiate(
+    paymentId: string,
+  ): Promise<void> {
+    if (!devPaymentChaosEnabled()) return;
+
+    // Mỗi lần vào nhánh chaos: đếm như lỗi hạ tầng (recordInfrastructureFailure) — chỉ tăng khi CB đã bật (PAYMENT_GATEWAY_CB_ENABLED).
+    await this.paymentGatewayCircuit.recordInfrastructureFailure();
+
+    const sleep = (ms: number) =>
+      new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+    const roll = Math.floor(Math.random() * 7);
+
+    switch (roll) {
+      case 0:
+        await sleep(120 + Math.random() * 400);
+        throw new HttpException(
+          {
+            code: 'payment_gateway_timeout',
+            message: '[DEV chaos] Timeout kết nối tới cổng thanh toán.',
+          },
+          HttpStatus.GATEWAY_TIMEOUT,
+        );
+
+      case 1:
+        throw new HttpException(
+          {
+            code: 'payment_provider_unavailable',
+            message: '[DEV chaos] Cổng thanh toán không phản hồi.',
+          },
+          HttpStatus.SERVICE_UNAVAILABLE,
+        );
+
+      case 2:
+        throw new BadRequestException({
+          code: 'payment_declined',
+          message:
+            '[DEV chaos] Thẻ / ví bị từ chối (giả lập — kiểm tra UI lỗi).',
+        });
+
+      case 3:
+        throw new ConflictException({
+          code: 'payment_duplicate_attempt',
+          message:
+            '[DEV chaos] Trùng yêu cầu thanh toán — thử Idempotency-Key khác để tái kiểm thử.',
+        });
+
+      case 4:
+        await sleep(1600 + Math.random() * 2400);
+        throw new HttpException(
+          {
+            code: 'payment_upstream_slow',
+            message: '[DEV chaos] Phía cổng xử lý quá chậm (REQUEST_TIMEOUT).',
+          },
+          HttpStatus.REQUEST_TIMEOUT,
+        );
+
+      case 5:
+        await this.finalizePaymentFailure(
+          paymentId,
+          '[DEV chaos] Lỗi phía PSP — đã lưu trạng thái payment failed.',
+        );
+        throw new BadRequestException({
+          code: 'payment_failed',
+          message:
+            '[DEV chaos] Thanh toán thất bại — kiểm tra payment status trong DB/UI.',
+        });
+
+      default:
+        throw new InternalServerErrorException({
+          code: 'payment_internal_error',
+          message: '[DEV chaos] Lỗi nội bộ kết nối cổng (500 giả lập).',
+        });
+    }
   }
 
   private async optionalPaymentGatewayHealthProbe(): Promise<void> {
@@ -386,6 +475,15 @@ export class PaymentsService {
       return { received: true };
     }
 
+    if (devPaymentChaosEnabled()) {
+      const reason =
+        DEV_WEBHOOK_CHAOS_REASONS[
+          Math.floor(Math.random() * DEV_WEBHOOK_CHAOS_REASONS.length)
+        ] ?? DEV_WEBHOOK_CHAOS_REASONS[0];
+      await this.finalizePaymentFailure(payload.paymentId, reason);
+      return { received: true };
+    }
+
     await this.finalizePaymentSuccess(payload.paymentId, payload.providerTxnId);
     return { received: true };
   }
@@ -488,6 +586,8 @@ export class PaymentsService {
       idemKey,
     );
     if (replayed) return replayed;
+
+    await this.devPaymentChaosMaybeThrowOnInitiate(paymentId);
 
     if (useMockPaymentGatewayRedirect()) {
       const publicBase = process.env.PUBLIC_APP_URL?.trim();

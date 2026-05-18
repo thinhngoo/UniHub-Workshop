@@ -1,92 +1,56 @@
-# UniHub Workshop — `src/`
+# Environment
 
-## Cấu trúc thư mục
+## Client
 
-```
-src/
-├── apps/
-│   ├── web-sv/          # @unihub/web-sv     — Web sinh viên (React + Vite)
-│   ├── web-admin/       # @unihub/web-admin  — Web admin/ban tổ chức (React + Vite)
-│   └── mobile-checkin/  # placeholder Expo (xem README bên trong)
-├── packages/
-│   ├── types/           # @unihub/types      — TypeScript domain types dùng chung
-│   └── api-client/      # @unihub/api-client — Axios client + endpoint functions
-│                        #                       + Idempotency-Key helper
-├── package.json         # workspace root
-├── pnpm-workspace.yaml
-├── tsconfig.base.json   # cấu hình TS chung
-├── .npmrc
-├── .editorconfig
-├── .prettierrc.json
-└── README.md (file này)
-```
+**web-sv & web-admin**
 
-Mọi package nội bộ được publish nội bộ qua workspace protocol (`workspace:*`), không cần build artifact (TS source được consume trực tiếp bởi Vite).
+- `VITE_API_URL` (optional): URL gốc của API backend (không dấu `/` cuối); nếu trống thì app dùng `/api` và dev proxy `http://localhost:3000`.
 
-## Môi trường
+**mobile-checkin**
 
-- **Node.js** ≥ 20.x
-- **pnpm** ≥ 10.x — cài qua corepack:
-  ```powershell
-  corepack enable pnpm
-  ```
-  Hoặc dùng `corepack pnpm <command>` không cần enable.
+- `EXPO_PUBLIC_API_URL` (optional): URL gốc API backend (không dấu `/` cuối); có fallback từ `app.config` / host Expo khi trống.
+- `QR_TOKEN_PREFIX="qrtok_"` (optional): Tiền tố chuỗi token trong mã QR check-in (phải khớp backend); có giá trị mặc định trong `app.config` khi trống.
 
-## Khởi chạy
+## Server
 
-```powershell
-# từ thư mục src/
-corepack pnpm install
+**API**
 
-# Web sinh viên — http://localhost:5173
-corepack pnpm dev:sv
+- `PORT` (optional): Cổng HTTP của Nest; mặc định `3000`.
+- `DATABASE_URL`: PostgreSQL connection string cho Prisma.
+- `REDIS_URL` (optional): Redis (BullMQ, idempotency, circuit breaker, …); mặc định `redis://127.0.0.1:6379`.
+- `JWT_SECRET`: Khóa ký JWT.
 
-# Web admin     — http://localhost:5174
-corepack pnpm dev:admin
-```
+**Giới hạn request** (@nestjs/throttler)
 
-Cả hai app proxy `/api/*` sang `VITE_API_URL` (mặc định `http://localhost:3000`)
-— xem `apps/*/.env.example`. Tạo file `.env` trong từng app.
+- `THROTTLE_TTL_MS` (optional): Cửa sổ thời gian tính rate (ms); trống hoặc không hợp lệ → mặc định `60000`.
+- `THROTTLE_LIMIT` (optional): Số request tối đa mỗi IP trong một cửa sổ TTL; trống hoặc không hợp lệ → mặc định `120`.
+- `TRUST_PROXY` (optional): Đặt `1` hoặc `true` khi chạy sau _reverse proxy_ để throttle dùng `X-Forwarded-For` làm IP client.
 
-## Scripts ở workspace root
+**Email**
 
-| Script              | Mô tả                                               |
-| ------------------- | --------------------------------------------------- |
-| `pnpm dev:sv`       | Chạy dev server web sinh viên (port 5173)           |
-| `pnpm dev:admin`    | Chạy dev server web admin (port 5174)               |
-| `pnpm build:web`    | Build production cả hai web app                     |
-| `pnpm build`        | Build tất cả packages + apps                        |
-| `pnpm typecheck`    | `tsc --noEmit` toàn bộ workspace                    |
-| `pnpm format`       | Prettier format toàn bộ workspace                   |
-| `pnpm format:check` | Prettier check (cho CI)                             |
+- `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASSWORD`, `MAIL_FROM` (optional): Cấu hình SMTP; có thể để trống — khi `SMTP_HOST` trống, khi đấy mailer dùng `jsonTransport`.
 
-## Stack đã chọn (theo `blueprint/design.md`)
+**Thanh toán — mock gateway** (redirect + webhook)
 
-- **React 18 + Vite 5 + TypeScript 5** (ADR-1, §2.2)
-- **Tailwind CSS 3** + tokens shadcn-style (Card / Button / Badge / Input)
-- **React Router v6** — file-based routing pattern
-- **TanStack Query v5** — data fetching, retry policy phù hợp với 429 (§6.1)
-- **react-hook-form + zod** — validation client + server
-- **axios** — HTTP client; interceptor xử lý 401 + refresh token (ADR-2)
-- **lucide-react** — icon set
-- **qrcode.react** — render QR check-in
-- **class-variance-authority + tailwind-merge** — variants cho UI components
+- `USE_MOCK_PAYMENT_GATEWAY` (optional): Bật mock; khi không set / `false`, `POST /payments` có thể hoàn tất đồng bộ (dev shortcut).
+- `PUBLIC_APP_URL` (optional): URL gốc của API; **cần set** khi `USE_MOCK_PAYMENT_GATEWAY=true`.
+- `MOCK_PAYMENT_WEBHOOK_SECRET` (optional): Secret cho header HMAC `x-mock-payment-signature` khi gọi `POST /payments/webhooks/mock-gateway`.
+- `PAYMENT_RETURN_URL_ALLOWLIST` (optional): Các tiền tố URL được phép cho `returnUrl` trong `POST /payments` (chống open redirect), cách nhau bằng dấu phẩy (vd. `http://localhost:5173,http://localhost:5174`).
 
-## `@unihub/api-client` — điểm cần lưu ý
+**Thanh toán — chaos (chỉ dev)**
 
-- `createApiClient(...)`: factory tạo axios instance, hỗ trợ auto-refresh trên 401 (mỗi app
-  tự quản access token qua interceptor riêng — cookie / Bearer / SecureStore).
-- `generateIdempotencyKey()` / `withIdempotencyKey(headers)`: client tự sinh UUIDv4
-  cho mỗi "intent" (theo §6.3 design.md). Đã được dùng trong các endpoint mutation:
-  - `POST /registrations`
-  - `POST /payments`
-  - `POST /checkin/batch`
-- `ApiError`: lớp lỗi chuẩn — gắn `status`, `code`, `message`, `details`. Các app
-  dùng `error instanceof ApiError` để xử lý 429 / 409 idempotency / 503 payment_unavailable.
+- `DEV_PAYMENT_CHAOS_MODE` (optional, **bị bỏ qua khi `NODE_ENV=production`**): `true` / `1` — gây lỗi initiate ngẫu nhiên (timeout, từ chối, 5xx, …)..
 
-## Tiếp theo
+**Thanh toán — circuit breaker**
 
-- [ ] `apps/backend` — NestJS modular monolith (ADR-1, §1.1)
-- [ ] `apps/mobile-checkin` — Expo init theo README trong thư mục đó
-- [ ] `packages/ui` — tách UI shared giữa web-sv & web-admin
-- [ ] `data/` — seed scripts cho workshop, user, role mẫu
+- `PAYMENT_GATEWAY_CB_ENABLED` (optional): Bật circuit breaker.
+- `PAYMENT_GATEWAY_CB_FAILURE_THRESHOLD` (optional): Ngưỡng lỗi; trống hoặc không hợp lệ → mặc định `5`.
+- `PAYMENT_GATEWAY_CB_RESET_MS` (optional): Thời gian reset circuit (ms); trống hoặc không hợp lệ → mặc định `60000`.
+- `PAYMENT_GATEWAY_CB_GRACEFUL_RESPONSE` (optional): Khi circuit mở / probe lỗi: trống / `true` → HTTP 200 + payload “degraded”; `0` / `false` → HTTP 503.
+- `PAYMENT_GATEWAY_CB_USER_MESSAGE` (optional): Thông báo user khi degraded.
+- `PAYMENT_GATEWAY_HEALTHCHECK_URL`, `PAYMENT_GATEWAY_HEALTHCHECK_TIMEOUT_MS` (optional): GET kiểm tra outbound; để trống nếu không dùng healthcheck.
+- `PAYMENT_GATEWAY_PROBE_RETRY_AFTER_SEC` (optional): Gợi ý retry (giây) cho probe.
+
+**Thanh toán — idempotency**
+
+- `PAYMENT_INIT_IDEMPOTENCY_TTL_SECONDS` (optional): TTL replay cho header `Idempotency-Key` ở `POST /payments`; trống hoặc không hợp lệ → mặc định `86400` (giây), và vẫn bị cắt theo thời gian giữ chỗ.

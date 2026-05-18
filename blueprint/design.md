@@ -62,6 +62,16 @@ _(HTTP: controller các module dùng `auth` (`AuthGuard`, `RolesGuard`) — khô
 
 _(Ngoài ra, module `admin` (optional) đọc tổng hợp từ `workshop` và `registration` cho dashboard)_
 
+**Khi gặp sự cố**:
+
+| Điểm lỗi                                                                                        | Trực tiếp                                                                                                                                                                                                                                                                                                                                           | Nhận xét                                                                           |
+| ----------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| **Tiến trình API Monolith** (crash, panic, leak bộ nhớ…)                                        | Toàn bộ HTTP API và worker cùng `node`/container **đều downtime** cho đến khi orchestrator khởi động lại. Không có cô lập theo module trong một process.                                                                                                                                                                                            | SPOF, cân nhắc deploy 2 process để an toàn (2 API + 1 queue).                      |
+| **PostgreSQL**                                                                                  | **Hầu hết luồng nghiệp vụ đồng bộ**: workshop, đăng ký, thanh toán (ghi DB), checkin, đồng bộ danh mục user, refresh/me đọc user… đều lỗi hoặc timeout.                                                                                                                                                                                             | SPOF, cân nhắc dùng database phụ.                                                  |
+| **Redis**                                                                                       | **Session đăng nhập** (`SessionStore`): web admin / nhân sự dùng session **không xác thực / không duy trì phiên** cho đến khi Redis hồi phục. **BullMQ**: không enqueue/consumer được — job `workshop-summary`, `notifications`, `student-sync`, `**reservation-expiry`** (giữ chỗ / giải phóng chỗ) **đứng hoặc không xử lý, không có worker chạy. | Ảnh hưởng rộng; **giữ chỗ có phí** không tự giải phóng khi queue/worker Redis lỗi. |
+| **Consumer queue / job lẻ** (e.g., worker `notification`, `workshop-summary` chậm hoặc ném lỗi) | Thông báo chậm/thất bại có retry theo Bull; tóm tắt AI chậm/ghi `failed`.                                                                                                                                                                                                                                                                           | Các chức năng lõi của hệ thống vẫn hoạt động tốt.                                  |
+| **Payment Gateway / AI bên thứ ba**                                                             | Thanh toán không khởi tạo/confirm được; không tóm tắt PDF được cho workshop đó.                                                                                                                                                                                                                                                                     |                                                                                    |
+
 ---
 
 ## 2. C4 Diagram
@@ -146,71 +156,6 @@ flowchart LR
 
     SIS -- CSV --> LB
 ```
-
----
-
-## High-Level Architecture
-
-### 1.3. Giữ chỗ có phí, thanh toán và thông báo email
-
-**Giữ chỗ & hết hạn (không dùng cron)**
-
-- Workshop có phí: sau transaction đăng ký, `registrations.status = reserved`, có `expires_at` (hằng `**RESERVATION_HOLD_MINUTES`, mặc định 15 phút), đã trừ `workshops.seats_left`.
-- **BullMQ delayed job** queue `**reservation-expiry`**: delay đến `expires_at` (job trễ lưu trong Redis). `**jobId`**dạng`release-hold-{registrationId}`— **không dùng ký tự`:` trong id (giới hạn BullMQ).
-- Worker xử lý job: trong một transaction — nếu vẫn `reserved` → `expired`, hoàn `**seats_left`**, và `**payments`**đang`\*_pending_`*của đăng ký đó →`\*\*failed\*\`\*+`last_error`.
-- Sau **thanh toán thành công**: **xoá** delayed job (`cancelScheduledRelease`) để tránh chạy expiry thừa (nếu job vẫn chạy sau confirm, worker không đổi chỗ vì không còn `reserved`).
-
-**Email (`@nestjs-modules/mailer`)**
-
-- Worker `**notifications` gửi mail qua nodemailer (body theo `template_code`, ví dụ `registration_success`, `payment_success`).
-- Env: `SMTP_`_, `MAIL_FROM`; không có `**SMTP_HOST`** → `**jsonTransport\*\`_ (không gửi SMTP thật, phục vụ dev/log).
-
-**Khi gặp sự cố**:
-
-| Điểm lỗi                                                                                        | Trực tiếp                                                                                                                                                                                                                                                                                                                                           | Nhận xét                                                                           |
-| ----------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
-| **Tiến trình API Monolith** (crash, panic, leak bộ nhớ…)                                        | Toàn bộ HTTP API và worker cùng `node`/container **đều downtime** cho đến khi orchestrator khởi động lại. Không có cô lập theo module trong một process.                                                                                                                                                                                            | SPOF, cân nhắc deploy 2 process để an toàn (2 API + 1 queue).                      |
-| **PostgreSQL**                                                                                  | **Hầu hết luồng nghiệp vụ đồng bộ**: workshop, đăng ký, thanh toán (ghi DB), checkin, đồng bộ danh mục user, refresh/me đọc user… đều lỗi hoặc timeout.                                                                                                                                                                                             | SPOF, cân nhắc dùng database phụ.                                                  |
-| **Redis**                                                                                       | **Session đăng nhập** (`SessionStore`): web admin / nhân sự dùng session **không xác thực / không duy trì phiên** cho đến khi Redis hồi phục. **BullMQ**: không enqueue/consumer được — job `workshop-summary`, `notifications`, `student-sync`, `**reservation-expiry`** (giữ chỗ / giải phóng chỗ) **đứng hoặc không xử lý, không có worker chạy. | Ảnh hưởng rộng; **giữ chỗ có phí** không tự giải phóng khi queue/worker Redis lỗi. |
-| **Consumer queue / job lẻ** (e.g., worker `notification`, `workshop-summary` chậm hoặc ném lỗi) | Thông báo chậm/thất bại có retry theo Bull; tóm tắt AI chậm/ghi `failed`.                                                                                                                                                                                                                                                                           | Các chức năng lõi của hệ thống vẫn hoạt động tốt.                                  |
-| **Payment Gateway / AI bên thứ ba**                                                             | Thanh toán không khởi tạo/confirm được; không tóm tắt PDF được cho workshop đó.                                                                                                                                                                                                                                                                     |
-
-### Nhập dữ liệu từ CSV đêm
-
-Luồng mô phỏng việc hệ thống quản lý sinh viên (SIS) export CSV vào ban đêm: backend nhận nội dung CSV, parse và **upsert** vào database
-
-#### Kích hoạt và hàng đợi
-
-- **API**: `POST /student-sync`, multipart field `**file`**, chỉ role `**admin`**. Kiểm tra đuôi `.csv`, kích thước tối đa **12 MiB**, đọc UTF-8; nếu thiếu file hoặc rỗng thì `400`.
-- **Worker**: Nội dung CSV được đưa vào **BullMQ** queue `student-sync`, job name `run`. Processor đọc `csvText` trong payload và gọi `StudentSyncService.syncFromCsvText`.
-- **Lịch "đêm"**: Code hiện **không** gắn `@Cron` do không có thông tin về file CSV sẽ export thế nào; có thể đặt **cron hoặc job scheduler** trong server / bên ngoài hoặc tự động quét CSV trong database (API hỗ trợ?). Dễ dàng update thông qua `student-sync` module.
-
-Cấu hình queue (module): **1 lần thử** mỗi job; giữ lỗi trong Redis (tuỳ cấu hình).
-
-#### Theo dõi job
-
-- `GET /student-sync/jobs/:jobId` — trả `state` (`waiting`, `active`, `completed`, `failed`, …). Khi `completed`, kèm `**report` (`imported`, `skippedRows`, `duplicateIdsSuperseded`, `issues`); khi `failed`, có `failedReason`.
-
-#### Định dạng CSV (ETL)
-
-- **Tiêu đề bắt buộc** (đủ tên cột, không phân biệt thứ tự): `id`, `student_code`, `email`, `password`, `full_name`, `status`, `created_at`, `updated_at`.
-- Parser **bỏ BOM**, bỏ dòng trống; tách ô theo **dấu phẩy đơn giản** (`split`) — **không** hỗ trợ định dạng CSV có trường bọc ngoặc kép / dấu phẩy trong cell.
-- `status`: `active` hoặc `disabled` (không phân biệt hoa thường).
-- `created_at` / `updated_at`: chuỗi thời gian; parser chuẩn hoá khoảng trắng → `T` và một số dạng offset ngắn trước khi `new Date(...)`.
-- Mỗi dòng hợp lệ được map sang bản ghi đồng bộ với `**role: 'student'`.
-
-#### Xử lý trùng và lỗi tại tầng file
-
-- **Trùng `id` trong cùng file**: giữ bản ghi **dòng sau** (last wins); các dòng trước ghi nhận issue `duplicate_id`.
-- **Trùng `email`** (so sánh không phân biệt hoa thường) hoặc **trùng `student_code`** (khi có giá trị) giữa các dòng đã hợp lệ: bỏ qua dòng sau, issue `duplicate_email` / `duplicate_student_code`.
-- Dòng lỗi định dạng (thiếu trường, `status` sai, timestamp sai, …) được ghi vào `issues` kèm **số dòng file** và không đưa vào danh sách upsert.
-
-#### Ghi CSDL (`users`)
-
-- Với mỗi dòng đã qua parse, `**UsersRepository.upsertSyncedStudentsReport`** gọi Prisma `**upsert`** theo `id` (**không bọc toàn bộ file trong một transaction** — một dòng lỗi không rollback các dòng khác).
-- **Không ghi đè** nếu `id` đã tồn tại và `role !== 'student'` → issue `role_conflict`.
-- **Không ghi** nếu `email` hoặc `student_code` (khi có) **đụng người dùng khác id** trong DB → `email_exists_db` / `student_code_exists_db`.
-- Lỗi Prisma/Exception khác trên từng dòng → `db_error` (message kèm chi tiết).
 
 ---
 
@@ -391,7 +336,7 @@ Storage mặc định của `@nestjs/throttler` là **in-memory trong process**:
 
 #### Các trạng thái CB
 
-| Trạng thái    | Ý nghĩa                                                                                                                                                                              | Chuyển trạng thái (tóm tắt)                                                                       |
+| Trạng thái    | Ý nghĩa                                                                                                                                                                              | Chuyển trạng thái                                                                                 |
 | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------- |
 | **Closed**    | Cho phép initiate. Đếm `failures` khi có lỗi hạ tầng; **thanh toán hoàn tất thành công** → reset về Closed + `failures = 0`.                                                         | `failures ≥ threshold` → **Open** + ghi `openedAtMs`.                                             |
 | **Open**      | Trong `PAYMENT_GATEWAY_CB_RESET_MS` kể từ mở, initiate bị graceful hoặc **503**.                                                                                                     | Hết cooldown → request đầu tiên đưa vào **Half-open** (ghi state Redis) và cho phép thử initiate. |
@@ -401,36 +346,41 @@ Storage mặc định của `@nestjs/throttler` là **in-memory trong process**:
 
 #### Giải pháp triển khai
 
-| Lớp                                       | Nội dung                                                                                                                                                                                                                                |
-| ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Idempotency-Key trên `POST /payments`** | Bắt buộc header `Idempotency-Key` (client giữ **cùng một key** cho mọi retry của **một intent**). API client bọc qua `withIdempotencyKey`.                                                                                              |
-| **Một intent → một snapshot Redis**       | Sau redirect mock hoặc **finalize đồng bộ**, lưu snapshot tối giản **`registrationId`**, **`redirectUrl`** (nullable).                                                                                                                  |
-| **Replay an toàn**                        | Cùng `(userId, Idempotency-Key)` và snapshot còn TTL → trả **cùng redirect** hoặc **succeeded đọc từ Postgres** — **không** cộng `attemptCount`, **không** tạo phiên checkout mới; luôn **đọc lại** row `payments` khớp `registration`. |
-| **Đăng ký (registration)**                | Workshop có phí: cột **`idempotency_key` UNIQUE** globale trong DB khi tạo payment lúc đăng ký — tách luồng **chống hai bản đăng ký hai payment** khỏi luồng **replay initiate**.                                                       |
-
-- **Redis**: prefix `payment_init:idemp:v1:`. **Fail-open** khi ghi: thanh toán vẫn chạy; replay có thể tạm thời không dùng được. Ưu tiên khả dụng thanh toán hơn đảm bảo chặt chẽ của cache idempotency
-- **PostgreSQL**: bản gốc của hệ thống `payment.status`, `provider_txn_id`, **`attempt_count`**; webhook/finalize idempotent không “trừ tiền” lần hai khi đã `succeeded`.
+| Lớp                                       | Nhiệm vụ                                                                                                                                                                                                       |
+| ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Idempotency-Key trên `POST /payments`** | Bắt buộc header `Idempotency-Key` (client giữ cùng một key cho mọi retry của **một intent**). API client bọc qua `withIdempotencyKey`.                                                                         |
+| **Replay** (Redis)                        | Cùng `(userId, Idempotency-Key)` và snapshot còn TTL → trả cùng redirect hoặc **succeeded đọc từ Postgres** — không cộng `attemptCount` hay tạo checkout mới; luôn đọc lại row `payments` khớp `registration`. |
+| **Registration** (Database)               | Workshop có phí: cột `idempotency_key` UNIQUE global trong DB khi tạo payment lúc đăng ký — tách luồng **chống hai bản đăng ký hai payment** khỏi luồng **replay initiate**.                            |
 
 #### TTL
 
-- Env `PAYMENT_INIT_IDEMPOTENCY_TTL_SECONDS` (`src/apps/api/.env.example`; mặc định code **86400** giây) là trần TTL snapshot.
-- Có `expires_at` giữ chỗ: TTL tính = `min(trần cấu hình, max(300, giây còn đến hết chỗ + 120 đệm))`, rồi **tối thiểu 120** trong code TTL logic; khi `SET` vào Redis, `EX ≥ max(60, TTL)` — tránh TTL quá ngắn gây mất replay vô lý nhưng vẫn không kéo dài replay sau khi chỗ reservation hết hiệu lực (trừ đệm có chủ đích).
+- `PAYMENT_INIT_IDEMPOTENCY_TTL_SECONDS`: mặc định **86400** giây.
+- Có `expires_at` giữ chỗ: TTL tính = `min(env, max(300, giây còn đến hết chỗ + 120 đệm))`.
 
 #### Luồng xử lý khi phát hiện trùng lặp
 
-1. Gate circuit breaker + probe như luồng `POST /payments` thường.
-2. **Đọc Redis** `(userId, Idempotency-Key)`:
-   - Không có key → initiate đầy đủ → `SETEX` snapshot + TTL.
-   - Có snapshot nhưng `registrationId` ≠ body → **409** `payment_init_idempotency_scope_mismatch`.
-   - Khớp `registrationId`:
-     - DB `succeeded` → 200 `{ payment, redirectUrl: null }`.
-     - `pending` + snapshot có **`redirectUrl`** → 200 cùng URL, không increment/mock session mới.
-     - `pending` nhưng snapshot thiếu redirect hoặc lệch thực tế DB → **XÓA** key Redis, **retry initiate** như request mới (phòng cache hỏng hoặc state đổi).
+`PaymentsService.initiateStudentPayment`:
 
-#### Giới hạn thiết kế & hướng mở rộng
+1. **Postgres (theo `registrationId` + user đăng nhập)**  
+   Đọc payment gắn đăng ký.  
+   - Nếu **`payment.status === succeeded`** → **200** `{ payment, redirectUrl: null }` (không gọi Redis).  
+   - Các trạng thái khác (`pending`, `failed`, …): tiếp tục kiểm tra nghiệp vụ (hoàn tiền, hết chỗ, đăng ký không còn chờ thanh toán, …).
 
-- Với cổng thanh toán production cần thêm **idempotency của provider** cho lệnh capture/debit — header này chỉ bọc initiate nội bộ + mock UX.
-- Session checkout **mock trong RAM** có TTL riêng; Redis replay có thể dài hơn — có thể cần **intent mới + key mới** nếu URL mock đã hết session nhưng key Redis vẫn đòi replay redirect cũ (xử lý sẽ có thể dẫn tới invalidate hoặc lỗi UI tùy cấu hình).
+2. **Header `Idempotency-Key`**  
+   Bắt buộc; key kết hợp với **`userId`** thành Redis key (hash key) — không dùng chung intent giữa hai user.
+
+3. **Circuit breaker + health probe outbound** (trước khi replay Redis)  
+   Có thể trả **200 degraded** hoặc **503** mà chưa vào bước idempotency replay.
+
+4. **Redis — replay `(userId, Idempotency-Key)`**  
+   - Không có snapshot → chạy initiate đầy đủ; sau khi có kết quả ổn định → **`SETEX`** snapshot (`registrationId`, `redirectUrl`, có thể cờ degraded, …) + TTL.  
+   - Có snapshot nhưng **`registrationId` trong snapshot ≠ body** → **409** `payment_init_idempotency_scope_mismatch`.  
+   - Khớp `registrationId` — **đọc lại** row `payments` từ Postgres:  
+     - DB **`succeeded`** → **200** `{ payment, redirectUrl: null }`.  
+     - **`pending`** và snapshot có **`redirectUrl`** → **200** trả lại cùng URL (không tăng `attemptCount`).  
+     - **Còn lại** (ví dụ không tìm thấy row; `pending` nhưng snapshot không đủ điều kiện replay redirect) → **XÓA** key Redis, đi tiếp như **request initiate mới** (phòng snapshot hỏng / state lệch).
+
+Lưu ý: snapshot Redis **không** thay thế bản ghi `payments`; replay luôn lấy trạng thái DB hiện tại.
 
 ---
 

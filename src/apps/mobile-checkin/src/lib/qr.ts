@@ -1,7 +1,7 @@
 import Constants from 'expo-constants';
 
 /**
- * Local QR verification (design.md §3.1 + ADR-9).
+ * Local QR verification.
  *
  * In the real system the QR encodes a JWS / HMAC token signed by the server,
  * which staff verify offline with a per-shift secret. For this mock backend
