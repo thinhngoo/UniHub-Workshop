@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, CreditCard } from 'lucide-react';
 import { ApiError, generateIdempotencyKey } from '@unihub/api-client';
@@ -25,6 +25,34 @@ export function RegistrationPaymentPage() {
   const [payError, setPayError] = useState<string | null>(null);
   const [idempotencyKey] = useState(() => generateIdempotencyKey());
 
+  useEffect(() => {
+    if (!registrationId) return;
+    const params = new URLSearchParams(window.location.search);
+    const ps = params.get('paymentStatus');
+    if (!ps) return;
+
+    void qc.invalidateQueries({ queryKey: ['registration-payment', registrationId] });
+    void qc.invalidateQueries({ queryKey: ['my-registrations'] });
+
+    if (ps === 'succeeded') {
+      navigate(`/me/registrations/${registrationId}/qr`, { replace: true });
+      return;
+    }
+
+    if (ps === 'failed') {
+      setPayError(
+        'Thanh toán không thành công hoặc đã hủy. Bạn có thể thử lại (giữ chỗ vẫn còn hiệu lực nếu chưa hết hạn).',
+      );
+      navigate(
+        {
+          pathname: `/me/registrations/${registrationId}/payment`,
+          search: '',
+        },
+        { replace: true },
+      );
+    }
+  }, [registrationId, navigate, qc]);
+
   const paymentQuery = useQuery({
     queryKey: ['registration-payment', registrationId],
     queryFn: () => api.registrations.getPaymentForRegistration(registrationId!),
@@ -33,10 +61,27 @@ export function RegistrationPaymentPage() {
   });
 
   const payMutation = useMutation({
-    mutationFn: () => api.payments.initiate({ registrationId: registrationId! }, idempotencyKey),
-    onSuccess: () => {
+    mutationFn: () => {
+      const returnUrl = `${window.location.origin}/me/registrations/${registrationId}/payment`;
+      return api.payments.initiate({ registrationId: registrationId!, returnUrl }, idempotencyKey);
+    },
+    onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: ['registration-payment', registrationId] });
       qc.invalidateQueries({ queryKey: ['my-registrations'] });
+
+      if (data.degraded) {
+        setPayError(
+          data.userMessage ??
+            `Hệ thống thanh toán đang quá tải hoặc tạm ngưng. Vui lòng thử lại sau khoảng ${data.retryAfterSeconds ?? 60} giây (giữ chỗ vẫn có hiệu lực trong thời gian quy định).`,
+        );
+        return;
+      }
+
+      if (data.redirectUrl) {
+        window.location.href = data.redirectUrl;
+        return;
+      }
+
       void navigate(`/me/registrations/${registrationId}/qr`, { replace: true });
     },
     onError: (e: unknown) => {

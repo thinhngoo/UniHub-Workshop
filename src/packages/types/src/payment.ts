@@ -16,9 +16,17 @@ export interface Payment {
 
 export interface InitiatePaymentRequest {
   registrationId: UUID;
+  /** URL trở về sau checkout redirect (SPA); server chỉ chấp nhận khi khớp PAYMENT_RETURN_URL_ALLOWLIST. */
+  returnUrl?: string;
 }
 
 export interface InitiatePaymentResponse {
   payment: Payment;
   redirectUrl: string | null;
+  /** HTTP 200 — graceful degradation khi circuit breaker / health cổng chặn initiate */
+  degraded?: boolean;
+  retryAfterSeconds?: number;
+  userMessage?: string;
+  /** open = đang trong cooldown circuit */
+  circuitState?: 'open';
 }

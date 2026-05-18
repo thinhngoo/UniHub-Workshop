@@ -3,6 +3,7 @@ import {
   Body,
   Controller,
   Get,
+  Headers,
   HttpCode,
   HttpStatus,
   Param,
@@ -61,7 +62,11 @@ export class PaymentsController {
   async initiate(
     @CurrentUser() user: User,
     @Body() body: InitiatePaymentDto,
+    @Headers('idempotency-key') idempotencyKey?: string,
   ): Promise<InitiatePaymentResponse> {
-    return this.payments.initiateStudentPayment(user.id, body.registrationId);
+    return this.payments.initiateStudentPayment(user.id, body.registrationId, {
+      returnUrl: body.returnUrl,
+      idempotencyKey,
+    });
   }
 }
