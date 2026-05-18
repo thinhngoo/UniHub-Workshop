@@ -84,7 +84,7 @@ function Header() {
                   className="absolute right-0 top-full z-50 mt-2 w-56 rounded-xl border border-slate-200 bg-white py-2 px-1 shadow-lg"
                   role="menu"
                 >
-                  <NavLink to="/me" className={menuNavItem} role="menuitem">
+                  <NavLink to="/me" end className={menuNavItem} role="menuitem">
                     <UserIcon className="size-4 shrink-0" />
                     Tài khoản
                   </NavLink>
