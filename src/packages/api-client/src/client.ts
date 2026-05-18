@@ -1,8 +1,4 @@
-import axios, {
-  AxiosError,
-  AxiosInstance,
-  AxiosRequestConfig,
-} from 'axios';
+import axios, { AxiosError, AxiosInstance, AxiosRequestConfig } from 'axios';
 import type { ApiErrorBody } from '@unihub/types';
 
 export interface CreateApiClientOptions {
@@ -28,13 +24,7 @@ export class ApiError extends Error {
 }
 
 export function createApiClient(options: CreateApiClientOptions): AxiosInstance {
-  const {
-    baseURL,
-    withCredentials,
-    onUnauthorized,
-    defaultHeaders,
-    refreshAccessToken,
-  } = options;
+  const { baseURL, withCredentials, onUnauthorized, defaultHeaders, refreshAccessToken } = options;
 
   const instance = axios.create({
     baseURL,

@@ -8,9 +8,8 @@
     "dev:admin": "pnpm --filter @unihub/web-admin dev",
     "dev:api": "pnpm --filter @unihub/api start:dev",
     "dev:checkin": "pnpm --filter @unihub/mobile-checkin start",
-    "build:web": "pnpm --filter @unihub/web-sv --filter @unihub/web-admin build",
     "typecheck": "pnpm -r typecheck",
-    "lint": "pnpm -r lint",
+    "lint:api": "pnpm --filter @unihub/api lint",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md,css,html}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md,css,html}\""
   },

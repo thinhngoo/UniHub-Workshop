@@ -130,23 +130,13 @@ export async function markResults(
         `UPDATE outbox
             SET status = ?, result_status = ?, registration_id = ?, message = ?, synced_at = ?
           WHERE client_event_id = ?`,
-        [
-          r.status,
-          r.resultStatus,
-          r.registrationId,
-          r.message,
-          syncedAt,
-          r.clientEventId,
-        ],
+        [r.status, r.resultStatus, r.registrationId, r.message, syncedAt, r.clientEventId],
       );
     }
   });
 }
 
-export async function markBatchFailed(
-  clientEventIds: string[],
-  message: string,
-): Promise<void> {
+export async function markBatchFailed(clientEventIds: string[], message: string): Promise<void> {
   if (clientEventIds.length === 0) return;
   const handle = await db();
   const syncedAt = new Date().toISOString();
@@ -169,10 +159,7 @@ export async function clearSynced(): Promise<void> {
 
 export async function deleteOne(clientEventId: string): Promise<void> {
   const handle = await db();
-  await handle.runAsync(
-    `DELETE FROM outbox WHERE client_event_id = ?`,
-    [clientEventId],
-  );
+  await handle.runAsync(`DELETE FROM outbox WHERE client_event_id = ?`, [clientEventId]);
 }
 
 export async function clearAll(): Promise<void> {

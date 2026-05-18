@@ -1,7 +1,7 @@
 import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import cookieParser from 'cookie-parser';
-import type { NextFunction, Request, Response } from 'express';
+import type { Application, NextFunction, Request, Response } from 'express';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
@@ -10,7 +10,8 @@ async function bootstrap() {
 
   const trustProxyEnv = process.env.TRUST_PROXY?.toLowerCase();
   if (trustProxyEnv === '1' || trustProxyEnv === 'true') {
-    app.getHttpAdapter().getInstance().set('trust proxy', 1);
+    const expressApp = app.getHttpAdapter().getInstance() as Application;
+    expressApp.set('trust proxy', 1);
   }
   const httpLogger = new Logger('HTTP');
 

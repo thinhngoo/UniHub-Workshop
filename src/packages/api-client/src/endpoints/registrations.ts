@@ -9,16 +9,14 @@ import type {
 import { withIdempotencyKey } from '../idempotency';
 
 export const registrationsApi = (http: AxiosInstance) => ({
-  listMine: () =>
-    http.get<Registration[]>('/registrations/me').then((r) => r.data),
+  listMine: () => http.get<Registration[]>('/registrations/me').then((r) => r.data),
   create: (body: CreateRegistrationRequest, idempotencyKey?: string) =>
     http
       .post<CreateRegistrationResponse>('/registrations', body, {
         headers: withIdempotencyKey({}, idempotencyKey),
       })
       .then((r) => r.data),
-  cancel: (id: UUID) =>
-    http.post<Registration>(`/registrations/${id}/cancel`).then((r) => r.data),
+  cancel: (id: UUID) => http.post<Registration>(`/registrations/${id}/cancel`).then((r) => r.data),
   getPaymentForRegistration: (registrationId: UUID) =>
     http.get<Payment>(`/registrations/${registrationId}/payment`).then((r) => r.data),
   getQr: (id: UUID) =>
@@ -27,7 +25,5 @@ export const registrationsApi = (http: AxiosInstance) => ({
       .then((r) => r.data),
   // Organizer/admin scope
   listByWorkshop: (workshopId: UUID) =>
-    http
-      .get<Registration[]>(`/workshops/${workshopId}/registrations`)
-      .then((r) => r.data),
+    http.get<Registration[]>(`/workshops/${workshopId}/registrations`).then((r) => r.data),
 });

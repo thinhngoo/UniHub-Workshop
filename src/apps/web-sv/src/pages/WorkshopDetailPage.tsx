@@ -26,8 +26,7 @@ export function WorkshopDetailPage() {
   });
 
   const registerMutation = useMutation({
-    mutationFn: () =>
-      api.registrations.create({ workshopId: id! }, idempotencyKey),
+    mutationFn: () => api.registrations.create({ workshopId: id! }, idempotencyKey),
     onSuccess: (res) => {
       qc.invalidateQueries({ queryKey: ['workshop', id] });
       qc.invalidateQueries({ queryKey: ['my-registrations'] });

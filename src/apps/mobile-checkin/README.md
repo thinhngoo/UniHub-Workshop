@@ -78,11 +78,11 @@ App tự suy ra `http://<expo-debugger-host>:3000` (tốt cho trường hợp ch
 
 ### Tài khoản mock (`@unihub/api` auth.service)
 
-| Email                    | Mật khẩu    | Roles           | Mục đích                      |
-| ------------------------ | ----------- | --------------- | ----------------------------- |
-| `staff@unihub.edu.vn`    | `staff1234` | `staff`         | Tài khoản chính của app này   |
-| `admin@unihub.edu.vn`    | `admin123`  | `admin`         | Cũng được phép gọi `/checkin` |
-| `student@…` / `organizer@…` | —        | —               | 403 khi gọi `/checkin/batch`  |
+| Email                       | Mật khẩu    | Roles   | Mục đích                      |
+| --------------------------- | ----------- | ------- | ----------------------------- |
+| `staff@unihub.edu.vn`       | `staff1234` | `staff` | Tài khoản chính của app này   |
+| `admin@unihub.edu.vn`       | `admin123`  | `admin` | Cũng được phép gọi `/checkin` |
+| `student@…` / `organizer@…` | —           | —       | 403 khi gọi `/checkin/batch`  |
 
 Form đăng nhập đã pre-fill tài khoản `staff` cho tiện demo.
 

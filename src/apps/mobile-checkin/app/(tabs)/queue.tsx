@@ -83,7 +83,10 @@ export default function QueueScreen() {
           e instanceof ApiError
             ? `${e.code}: ${e.message}`
             : ((e as Error)?.message ?? 'unknown_error');
-        await markBatchFailed(pending.map((r) => r.clientEventId), message);
+        await markBatchFailed(
+          pending.map((r) => r.clientEventId),
+          message,
+        );
         throw e;
       }
     },
@@ -93,30 +96,24 @@ export default function QueueScreen() {
     },
     onError: (e) => {
       const msg =
-        e instanceof ApiError
-          ? e.message
-          : ((e as Error)?.message ?? 'Đồng bộ thất bại.');
+        e instanceof ApiError ? e.message : ((e as Error)?.message ?? 'Đồng bộ thất bại.');
       setError(msg);
       void qc.invalidateQueries({ queryKey: QUEUE_KEY });
     },
   });
 
   const onClearSynced = useCallback(() => {
-    Alert.alert(
-      'Dọn các mục đã đồng bộ',
-      'Xóa toàn bộ mục đã gửi thành công khỏi hàng đợi?',
-      [
-        { text: 'Hủy', style: 'cancel' },
-        {
-          text: 'Xóa',
-          style: 'destructive',
-          onPress: async () => {
-            await clearSynced();
-            void qc.invalidateQueries({ queryKey: QUEUE_KEY });
-          },
+    Alert.alert('Dọn các mục đã đồng bộ', 'Xóa toàn bộ mục đã gửi thành công khỏi hàng đợi?', [
+      { text: 'Hủy', style: 'cancel' },
+      {
+        text: 'Xóa',
+        style: 'destructive',
+        onPress: async () => {
+          await clearSynced();
+          void qc.invalidateQueries({ queryKey: QUEUE_KEY });
         },
-      ],
-    );
+      },
+    ]);
   }, [qc]);
 
   const syncOneItem = useCallback(
@@ -179,10 +176,7 @@ export default function QueueScreen() {
           </Text>
         </View>
         <TouchableOpacity
-          style={[
-            styles.syncBtn,
-            (sync.isPending || pendingCount === 0) && styles.syncBtnDisabled,
-          ]}
+          style={[styles.syncBtn, (sync.isPending || pendingCount === 0) && styles.syncBtnDisabled]}
           disabled={sync.isPending || pendingCount === 0}
           onPress={() => sync.mutate()}
           accessibilityRole="button"
@@ -206,9 +200,7 @@ export default function QueueScreen() {
       <FlatList<OutboxRow>
         data={rows}
         keyExtractor={(item) => item.clientEventId}
-        contentContainerStyle={
-          rows.length === 0 ? styles.emptyList : styles.list
-        }
+        contentContainerStyle={rows.length === 0 ? styles.emptyList : styles.list}
         refreshControl={
           <RefreshControl
             refreshing={rowsQuery.isRefetching}
@@ -221,14 +213,10 @@ export default function QueueScreen() {
         ListEmptyComponent={
           <View style={styles.empty}>
             <Text style={styles.emptyTitle}>Chưa có mục nào</Text>
-            <Text style={styles.emptyBody}>
-              Quét QR để thêm lượt check-in vào hàng đợi.
-            </Text>
+            <Text style={styles.emptyBody}>Quét QR để thêm lượt check-in vào hàng đợi.</Text>
           </View>
         }
-        renderItem={({ item }) => (
-          <Row item={item} onSync={syncOneItem} onDelete={deleteOneItem} />
-        )}
+        renderItem={({ item }) => <Row item={item} onSync={syncOneItem} onDelete={deleteOneItem} />}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
       />
 
@@ -314,7 +302,10 @@ function headlineFor(row: OutboxRow): { label: string; color: string } {
   if (row.status === 'failed') {
     return { label: 'Lỗi đồng bộ', color: colors.danger };
   }
-  return { label: SERVER_LABEL[row.resultStatus ?? 'accepted'], color: SERVER_COLOR[row.resultStatus ?? 'accepted'] };
+  return {
+    label: SERVER_LABEL[row.resultStatus ?? 'accepted'],
+    color: SERVER_COLOR[row.resultStatus ?? 'accepted'],
+  };
 }
 
 const SERVER_LABEL: Record<CheckInBatchItemStatus, string> = {

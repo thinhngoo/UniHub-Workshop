@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
-import { Bell, CalendarDays, ScanLine, User } from 'lucide-react';import { buttonVariants } from '@/components/ui/button';
+import { Bell, CalendarDays, ScanLine, User } from 'lucide-react';
+import { buttonVariants } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@unihub/format/cn';
 

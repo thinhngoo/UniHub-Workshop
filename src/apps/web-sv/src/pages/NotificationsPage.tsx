@@ -7,10 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { formatCurrencyVND, formatDateTime } from '@unihub/format';
 
-const STATUS_TONE: Record<
-  NotificationMessage['status'],
-  'warning' | 'success' | 'danger'
-> = {
+const STATUS_TONE: Record<NotificationMessage['status'], 'warning' | 'success' | 'danger'> = {
   pending: 'warning',
   sent: 'success',
   failed: 'danger',
@@ -34,8 +31,7 @@ function describeNotification(n: NotificationMessage): {
   detail?: string | null;
 } {
   const { templateCode, payload } = n;
-  const workshopTitle =
-    payloadString(payload, 'workshopTitle') ?? 'Workshop của bạn';
+  const workshopTitle = payloadString(payload, 'workshopTitle') ?? 'Workshop của bạn';
 
   if (templateCode === 'registration_success') {
     return {

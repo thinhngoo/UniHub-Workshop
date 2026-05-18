@@ -1,10 +1,5 @@
 import type { AxiosInstance } from 'axios';
-import type {
-  InitiatePaymentRequest,
-  InitiatePaymentResponse,
-  Payment,
-  UUID,
-} from '@unihub/types';
+import type { InitiatePaymentRequest, InitiatePaymentResponse, Payment, UUID } from '@unihub/types';
 import { withIdempotencyKey } from '../idempotency';
 
 export const paymentsApi = (http: AxiosInstance) => ({

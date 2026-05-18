@@ -62,7 +62,13 @@ export function QrPage() {
               <p className="text-center text-xs text-slate-500">
                 Xuất trình mã này tại khu vực check-in của workshop.
               </p>
-              <Button type="button" variant="secondary" size="md" onClick={downloadQrPng} className="cursor-pointer">
+              <Button
+                type="button"
+                variant="secondary"
+                size="md"
+                onClick={downloadQrPng}
+                className="cursor-pointer"
+              >
                 <Download className="size-4" />
                 Tải ảnh QR
               </Button>

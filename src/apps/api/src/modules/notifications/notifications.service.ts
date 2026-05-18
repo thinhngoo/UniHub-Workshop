@@ -28,7 +28,7 @@ export class NotificationsService {
       row.payloadJson !== null &&
       !Array.isArray(row.payloadJson)
     ) {
-      payload = row.payloadJson as Record<string, unknown>;
+      payload = row.payloadJson;
     }
 
     return {

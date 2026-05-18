@@ -33,9 +33,12 @@ export default function ScanScreen() {
     bannerTimerRef.current = setTimeout(() => setBanner(null), 2_000);
   }, []);
 
-  useEffect(() => () => {
-    if (bannerTimerRef.current) clearTimeout(bannerTimerRef.current);
-  }, []);
+  useEffect(
+    () => () => {
+      if (bannerTimerRef.current) clearTimeout(bannerTimerRef.current);
+    },
+    [],
+  );
 
   useFocusEffect(
     useCallback(() => {
@@ -50,42 +53,45 @@ export default function ScanScreen() {
     }
   }, [permission, requestPermission]);
 
-  const onScanned = useCallback(async ({ data }: { data: string }) => {
-    const now = Date.now();
-    if (data === lastScanRef.current.token && now - lastScanRef.current.at < RESCAN_WINDOW_MS) {
-      return;
-    }
-    lastScanRef.current = { token: data, at: now };
+  const onScanned = useCallback(
+    async ({ data }: { data: string }) => {
+      const now = Date.now();
+      if (data === lastScanRef.current.token && now - lastScanRef.current.at < RESCAN_WINDOW_MS) {
+        return;
+      }
+      lastScanRef.current = { token: data, at: now };
 
-    const result = verifyQr(data);
-    if (!result.ok) {
-      showBanner({
-        tone: 'danger',
-        title: 'QR không hợp lệ',
-        detail: result.reason,
-      });
-      return;
-    }
+      const result = verifyQr(data);
+      if (!result.ok) {
+        showBanner({
+          tone: 'danger',
+          title: 'QR không hợp lệ',
+          detail: result.reason,
+        });
+        return;
+      }
 
-    try {
-      await enqueue({
-        clientEventId: newUuid(),
-        qrToken: result.token,
-        scannedAt: new Date().toISOString(),
-      });
-      showBanner({
-        tone: 'success',
-        title: 'Đã ghi vào hàng đợi',
-        detail: result.token,
-      });
-    } catch (e) {
-      showBanner({
-        tone: 'danger',
-        title: 'Lỗi lưu outbox',
-        detail: (e as Error)?.message,
-      });
-    }
-  }, [showBanner]);
+      try {
+        await enqueue({
+          clientEventId: newUuid(),
+          qrToken: result.token,
+          scannedAt: new Date().toISOString(),
+        });
+        showBanner({
+          tone: 'success',
+          title: 'Đã ghi vào hàng đợi',
+          detail: result.token,
+        });
+      } catch (e) {
+        showBanner({
+          tone: 'danger',
+          title: 'Lỗi lưu outbox',
+          detail: (e as Error)?.message,
+        });
+      }
+    },
+    [showBanner],
+  );
 
   const onLogout = useCallback(() => {
     Alert.alert('Đăng xuất', 'Bạn chắc chắn muốn đăng xuất?', [

@@ -1,26 +1,31 @@
 # UniHub Workshop — Technical Design
 
+---
+
 ## 1. Kiến trúc tổng thể
 
 ### 1.1. Phong cách kiến trúc
 
-**Modular Monolith cho Backend API** kết hợp với 3 hệ **client tách biệt** (Web SV, Web Admin, Mobile Staff) và một số **worker chạy nền** cho các tác vụ bất đồng bộ. Microservices ở backend tạo overhead vận hành. Monolith cho phép các module centralized và refactor dễ dàng; sẽ cân nhắc tách khi mục tiêu nghiệp vụ đủ lớn và phức tạp.
+**Modular Monolith cho Backend API** và **worker chạy nền** kết hợp với 3 hệ **client tách biệt** (Web SV, Web Admin, Mobile Staff). Microservices ở backend tạo overhead vận hành. Monolith cho phép các module centralized, refactor dễ dàng, với các yêu cầu nghiệp vụ có liên quan chặt chẽ khó tách biệt; sẽ cân nhắc tách khi mục tiêu nghiệp vụ đủ lớn và phức tạp. Có thể cân nhắc tách worker chạy nền và api process riêng.
 
-**Hàng đợi (BullMQ trên Redis)**: các **consumer** có `@Processor` gồm queue `workshop-summary`, `notifications`, `student-sync`, và `reservation-expiry`. Module **registration** / **payment** đóng vai **producer**.
+**Queue**:
 
-| Module         | Chức năng chính                                                    | Queue (BullMQ)                                                                                                                                                                               |
+- _Consumer_: `workshop-summary`, `notifications`, `student-sync`, `reservation-expiry`.
+- _Producer_: `registration` / `payment`.
+
+### 1.2. Tương tác
+
+Các module nghiệp vụ giao tiếp qua **inject service** (NestJS), không gọi HTTP nội bộ.
+
+| Module         | Chức năng                                                          | Queue (BullMQ)                                                                                                                                                                               |
 | -------------- | ------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `auth`         | Xác thực, kiểm tra role (RBAC)                                     | —                                                                                                                                                                                            |
 | `workshop`     | CRUD workshop, quản lý số chỗ, ai summary                          | **Consumer** queue `workshop-summary` — job tóm tắt nội dung workshop (PDF → AI).                                                                                                            |
 | `registration` | Giữ chỗ (reservation), xác nhận, phát hành mã QR                   | **Producer** delayed job → queue `reservation-expiry` (TTL giữ chỗ có phí); **consumer** cùng queue (worker giải phóng chỗ). **Producer** → `notifications` khi đăng ký miễn phí thành công. |
 | `payment`      | Khởi tạo giao dịch, idempotency, circuit breaker                   | **Producer** enqueue → queue `notifications` (thanh toán thành công); sau confirm **xoá** delayed job giữ chỗ (không còn worker expiry cho đăng ký đó).                                      |
 | `checkin`      | Nhận sự kiện check-in, chống trùng                                 | —                                                                                                                                                                                            |
-| `notification` | Điều phối gửi thông báo qua nhiều kênh (app, email, …), dễ mở rộng | **Consumer** queue `notifications` — dispatch.                                                                                                                                               |
+| `notification` | Điều phối gửi thông báo qua nhiều kênh (app, email, …), dễ mở rộng | **Consumer** queue `notifications`.                                                                                                                                                          |
 | `student-sync` | Import CSV hằng đêm từ hệ thống sinh viên cũ                       | **Consumer** queue `student-sync` — job xử lý file CSV đã nhập.                                                                                                                              |
-
-### 1.2. Tương tác
-
-Các module nghiệp vụ trong **Monolith** giao tiếp qua **inject service** (NestJS), không gọi HTTP nội bộ.
 
 **Tổng quan**:
 
@@ -53,33 +58,11 @@ flowchart TB
   Domain --> DA
 ```
 
-_(HTTP: controller các module dùng **auth** (`AuthGuard`, `RolesGuard`) — không vẽ nét để tránh chồng chéo.)_
+_(HTTP: controller các module dùng `auth` (`AuthGuard`, `RolesGuard`) — không vẽ nét để tránh chồng chéo.)_
 
-_(Ngoài ra, module `admin` đọc tổng hợp từ **workshop** và **registration** cho dashboard)_
+_(Ngoài ra, module `admin` (optional) đọc tổng hợp từ `workshop` và `registration` cho dashboard)_
 
-### 1.3. Giữ chỗ có phí, thanh toán và thông báo email
-
-**Giữ chỗ & hết hạn (không dùng cron)**
-
-- Workshop có phí: sau transaction đăng ký, `registrations.status = reserved`, có `expires_at` (hằng `**RESERVATION_HOLD_MINUTES`, mặc định 15 phút), đã trừ `workshops.seats_left`.
-- **BullMQ delayed job** queue `**reservation-expiry`**: delay đến `expires_at` (job trễ lưu trong Redis). `**jobId`**dạng`release-hold-{registrationId}`— **không dùng ký tự`:` trong id (giới hạn BullMQ).
-- Worker xử lý job: trong một transaction — nếu vẫn `reserved` → `expired`, hoàn `**seats_left`**, và `**payments`**đang`\*_pending_`*của đăng ký đó →`\*\*failed\*\`\*+`last_error`.
-- Sau **thanh toán thành công**: **xoá** delayed job (`cancelScheduledRelease`) để tránh chạy expiry thừa (nếu job vẫn chạy sau confirm, worker không đổi chỗ vì không còn `reserved`).
-
-**Email (`@nestjs-modules/mailer`)**
-
-- Worker `**notifications` gửi mail qua nodemailer (body theo `template_code`, ví dụ `registration_success`, `payment_success`).
-- Env: `SMTP_`_, `MAIL_FROM`; không có `**SMTP_HOST`** → `**jsonTransport\*\`_ (không gửi SMTP thật, phục vụ dev/log).
-
-**Khi gặp sự cố**:
-
-| Điểm lỗi                                                                                        | Trực tiếp                                                                                                                                                                                                                                                                                                                                           | Nhận xét                                                                           |
-| ----------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
-| **Tiến trình API Monolith** (crash, panic, leak bộ nhớ…)                                        | Toàn bộ HTTP API và worker cùng `node`/container **đều downtime** cho đến khi orchestrator khởi động lại. Không có cô lập theo module trong một process.                                                                                                                                                                                            | SPOF, cân nhắc deploy 2 process để an toàn (2 API + 1 queue).                      |
-| **PostgreSQL**                                                                                  | **Hầu hết luồng nghiệp vụ đồng bộ**: workshop, đăng ký, thanh toán (ghi DB), checkin, đồng bộ danh mục user, refresh/me đọc user… đều lỗi hoặc timeout.                                                                                                                                                                                             | SPOF, cân nhắc dùng database phụ.                                                  |
-| **Redis**                                                                                       | **Session đăng nhập** (`SessionStore`): web admin / nhân sự dùng session **không xác thực / không duy trì phiên** cho đến khi Redis hồi phục. **BullMQ**: không enqueue/consumer được — job `workshop-summary`, `notifications`, `student-sync`, `**reservation-expiry`** (giữ chỗ / giải phóng chỗ) **đứng hoặc không xử lý, không có worker chạy. | Ảnh hưởng rộng; **giữ chỗ có phí** không tự giải phóng khi queue/worker Redis lỗi. |
-| **Consumer queue / job lẻ** (e.g., worker `notification`, `workshop-summary` chậm hoặc ném lỗi) | Thông báo chậm/thất bại có retry theo Bull; tóm tắt AI chậm/ghi `failed`.                                                                                                                                                                                                                                                                           | Các chức năng lõi của hệ thống vẫn hoạt động tốt.                                  |
-| **Payment Gateway / AI bên thứ ba**                                                             | Thanh toán không khởi tạo/confirm được; không tóm tắt PDF được cho workshop đó.                                                                                                                                                                                                                                                                     |                                                                                    |
+---
 
 ## 2. C4 Diagram
 
@@ -97,17 +80,17 @@ flowchart TB
 
     PG[(Payment Gateway)]
     AI[(AI Model)]
-    SIS[(Student Info System<br/>CSV nightly)]
+    SIS[(Student Info System)]
     NOTI[(Platform Provider<br/>Email / Telegram / ...)]
 
-    SV  -- Xem lịch, đăng ký, nhận QR --> Core
-    BTC -- Quản lý workshop --> Core
-    NSC -- Quét QR check-in --> Core
-    SIS --> Core
+    SV  -- Xem lịch, đăng ký, nhận QR --> UH
+    BTC -- Quản lý workshop --> UH
+    NSC -- Quét QR check-in --> UH
+    SIS -- Gửi CSV --> UH
 
-    Core -- Khởi tạo / xác nhận giao dịch --> PG
-    Core -- Gửi nội dung PDF, nhận summary --> AI
-    Core -- Gửi thông báo --> NOTI
+    UH -- Yêu cầu / xác nhận giao dịch --> PG
+    UH -- Gửi nội dung, nhận summary --> AI
+    UH -- Gửi thông báo --> NOTI
 ```
 
 ### 2.2. Level 2 — Container
@@ -124,12 +107,12 @@ flowchart LR
         Mobile["Mobile App — Nhân sự<br/>React Native + SQLite"]
     end
 
-    LB["API Gateway / Load Balancer<br/>+ Rate Limiter<br/>Nginx / Traefik + Redis"]
+    LB["API Gateway / Load Balancer<br/>+ Rate Limiter"]
 
     subgraph Backend
-        API["Monolith Backend API<br/>NestJS"]
+        API["Backend API<br/>NestJS"]
         Worker["Async Worker(s)"]
-        MQ[("Message Broker<br/>BullMQ on Redis")]
+        MQ[("Message Broker<br/>BullMQ")]
     end
 
     SQL[("Relational DB<br/>PostgreSQL + Prisma")]
@@ -158,7 +141,7 @@ flowchart LR
 
     MQ --> Worker
     Worker --> SQL
-    Worker -- HTTP --> AI
+    Worker -- Module/HTTP --> AI
     Worker -- SMTP/API --> MAIL
 
     SIS -- CSV --> LB
@@ -166,7 +149,31 @@ flowchart LR
 
 ---
 
-## High-Level Architecture Diagram
+## High-Level Architecture
+
+### 1.3. Giữ chỗ có phí, thanh toán và thông báo email
+
+**Giữ chỗ & hết hạn (không dùng cron)**
+
+- Workshop có phí: sau transaction đăng ký, `registrations.status = reserved`, có `expires_at` (hằng `**RESERVATION_HOLD_MINUTES`, mặc định 15 phút), đã trừ `workshops.seats_left`.
+- **BullMQ delayed job** queue `**reservation-expiry`**: delay đến `expires_at` (job trễ lưu trong Redis). `**jobId`**dạng`release-hold-{registrationId}`— **không dùng ký tự`:` trong id (giới hạn BullMQ).
+- Worker xử lý job: trong một transaction — nếu vẫn `reserved` → `expired`, hoàn `**seats_left`**, và `**payments`**đang`\*_pending_`*của đăng ký đó →`\*\*failed\*\`\*+`last_error`.
+- Sau **thanh toán thành công**: **xoá** delayed job (`cancelScheduledRelease`) để tránh chạy expiry thừa (nếu job vẫn chạy sau confirm, worker không đổi chỗ vì không còn `reserved`).
+
+**Email (`@nestjs-modules/mailer`)**
+
+- Worker `**notifications` gửi mail qua nodemailer (body theo `template_code`, ví dụ `registration_success`, `payment_success`).
+- Env: `SMTP_`_, `MAIL_FROM`; không có `**SMTP_HOST`** → `**jsonTransport\*\`_ (không gửi SMTP thật, phục vụ dev/log).
+
+**Khi gặp sự cố**:
+
+| Điểm lỗi                                                                                        | Trực tiếp                                                                                                                                                                                                                                                                                                                                           | Nhận xét                                                                           |
+| ----------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| **Tiến trình API Monolith** (crash, panic, leak bộ nhớ…)                                        | Toàn bộ HTTP API và worker cùng `node`/container **đều downtime** cho đến khi orchestrator khởi động lại. Không có cô lập theo module trong một process.                                                                                                                                                                                            | SPOF, cân nhắc deploy 2 process để an toàn (2 API + 1 queue).                      |
+| **PostgreSQL**                                                                                  | **Hầu hết luồng nghiệp vụ đồng bộ**: workshop, đăng ký, thanh toán (ghi DB), checkin, đồng bộ danh mục user, refresh/me đọc user… đều lỗi hoặc timeout.                                                                                                                                                                                             | SPOF, cân nhắc dùng database phụ.                                                  |
+| **Redis**                                                                                       | **Session đăng nhập** (`SessionStore`): web admin / nhân sự dùng session **không xác thực / không duy trì phiên** cho đến khi Redis hồi phục. **BullMQ**: không enqueue/consumer được — job `workshop-summary`, `notifications`, `student-sync`, `**reservation-expiry`** (giữ chỗ / giải phóng chỗ) **đứng hoặc không xử lý, không có worker chạy. | Ảnh hưởng rộng; **giữ chỗ có phí** không tự giải phóng khi queue/worker Redis lỗi. |
+| **Consumer queue / job lẻ** (e.g., worker `notification`, `workshop-summary` chậm hoặc ném lỗi) | Thông báo chậm/thất bại có retry theo Bull; tóm tắt AI chậm/ghi `failed`.                                                                                                                                                                                                                                                                           | Các chức năng lõi của hệ thống vẫn hoạt động tốt.                                  |
+| **Payment Gateway / AI bên thứ ba**                                                             | Thanh toán không khởi tạo/confirm được; không tóm tắt PDF được cho workshop đó.                                                                                                                                                                                                                                                                     |
 
 ### Nhập dữ liệu từ CSV đêm
 
@@ -213,10 +220,10 @@ Cấu hình queue (module): **1 lần thử** mỗi job; giữ lỗi trong Redis
 
 Dùng **Relational DB (SQL)** làm kho dữ liệu chính, kết hợp với **key-value store** cho dữ liệu tạm thời.
 
-| Loại dữ liệu                                                                                                                                                                           | Storage            | Lý do                                                                                         |
-| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------ | --------------------------------------------------------------------------------------------- |
-| User, Workshop, Registration, Payment, Check-in, Notification                                                                                                                          | **Relational DB**  | Cần ACID cho nghiệp vụ giữ chỗ và thanh toán; quan hệ giữa các entity rõ ràng; query thống kê |
-| Rate-limit counter (ứng dụng: `@nestjs/throttler` mặc định là **in-memory trong process**; có thể chuyển Redis khi scale ngang), Idempotency key, Circuit breaker state, Session cache | **KV / in-memory** | Truy cập nhiều, TTL ngắn, không cần bền vững tuyệt đối                                        |
+| Dữ liệu                                                                                      | Storage            | Lý do                                                                                         |
+| -------------------------------------------------------------------------------------------- | ------------------ | --------------------------------------------------------------------------------------------- |
+| User, Workshop, Registration, Payment, Check-in, Notification                                | **Relational DB**  | Cần ACID cho nghiệp vụ giữ chỗ và thanh toán; quan hệ giữa các entity rõ ràng; query thống kê |
+| Rate-limit counter, Idempotency key, Circuit breaker state, Session cache, Queue information | **KV / in-memory** | Truy cập nhiều, TTL ngắn, không cần bền vững tuyệt đối                                        |
 
 ### Sơ đồ quan hệ (ER)
 
@@ -311,39 +318,37 @@ erDiagram
 
 ## Thiết kế kiểm soát truy cập
 
-### Xác thực (authentication)
+### Xác thực
 
-Backend dùng `**AuthGuard**`: đọc **Bearer JWT** (`Authorization`) hoặc **session id** (cookie/header tùy cấu hình extract), gọi `AuthService.me`, rồi gắn `req.user` (kèm `role`) cho request hiện tại. Thất bại → **401** (`unauthenticated`).
+Backend dùng `AuthGuard`: đọc **Bearer JWT** (`Authorization`) hoặc **session id** (cookie/header tùy client), gọi `AuthService.me`, rồi gắn `req.user` (kèm `role`) cho request hiện tại. Thất bại → **401** (`unauthenticated`).
 
 Triển khai client:
 
-- **Web admin / nhân sự (mobile)** — **session**.
-- **Sinh viên (web)** — **JWT**.
+- Web admin / nhân sự (mobile) — session.
+- Sinh viên (web) — JWT.
 
-### Ủy quyền theo vai trò (RBAC)
+### Ủy quyền RBAC
 
 **Triển khai tại API**, UX hỗ trợ hiển thị.
 
-| Thành phần     | Vai trò                                                                                                                          |
-| -------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| `**RolesGuard` | Đọc metadata `@Roles(...)` trên handler hoặc class (`Reflector`); nếu route **không** khai báo role thì không chặn theo vai trò. |
-| `**@Roles`     | Liệt kê một hoặc nhiều `RoleCode` được phép (`'student'                                                                          |
-| Chuỗi guard    | Route cần phân quyền đặt `@UseGuards(AuthGuard, RolesGuard)` — **luôn cần** `AuthGuard` trước để có `req.user`.                  |
+| Thành phần   | Vai trò                                                                                                         |
+| ------------ | --------------------------------------------------------------------------------------------------------------- |
+| `RolesGuard` | Đọc metadata `@Roles(...)` và kiểm tra.                                                                         |
+| `@Roles`     | Liệt kê một hoặc nhiều `RoleCode` được phép.                                                                    |
+| Chuỗi guard  | Route cần phân quyền đặt `@UseGuards(AuthGuard, RolesGuard)` — **luôn cần** `AuthGuard` trước để có `req.user`. |
 
 Luồng trong `RolesGuard`:
 
 - Không có `req.user` → **401**.
 - `user.role` không nằm trong danh sách `@Roles` → **403** (`forbidden`).
-- Thuộc danh sách → cho phép tiếp tục (sau đó tằng service vẫn có thể giới hạn theo **id chủ thể**, ví dụ chỉ đọc đăng ký của chính user đó).
+- Thuộc danh sách → cho phép tiếp tục (sau đó tầng service vẫn có thể giới hạn theo **id chủ thể**, ví dụ chỉ đọc đăng ký của chính user đó).
 
-### Permission
-
-| Role        | Permission (ý định)                                                                                                             |
-| ----------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| `student`   | `workshop:read`, `registration:create(self)`, `registration:read(self)`, `registration:cancel(self)`, `notification:read(self)` |
-| `organizer` | `workshop:`, `registration:read(any)`                                                                                           |
-| `staff`     | `checkin:create`, `checkin:batch_sync`, `registration:read(byqr)`                                                               |
-| `admin`     | Toàn quyền trên các route được bảo vệ bằng role (và các route chỉ `@Roles('admin')` như nhập CSV).                              |
+| Role        | Permission                                                                                         |
+| ----------- | -------------------------------------------------------------------------------------------------- |
+| `student`   | `workshop:read`, `registration:create(self)`, `registration:read(self)`, `notification:read(self)` |
+| `organizer` | `workshop:*`, `registration:read(any)`                                                             |
+| `staff`     | `checkin:create`, `checkin:batch_sync`                                                             |
+| `admin`     | Toàn quyền.                                                                                        |
 
 ---
 
@@ -353,49 +358,36 @@ Luồng trong `RolesGuard`:
 
 #### Giải pháp triển khai
 
-**Chiến lược nhiều lớp** (thiết kế):
+**Chiến lược nhiều lớp**:
 
-| Lớp                                    | Vai trò                                                                                            |
-| -------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| **Gateway / LB**                       | Là vị chí chủ chốt, rate limit và TLS gần biên mạng; bảo vệ trước khi request vào Node.            |
-| **Ứng dụng API (`@nestjs/throttler`)** | Fixed window, giới hạn theo **IP client** trên toàn API và **siết thêm** trên từng route nhạy cảm. |
-| **Queue & worker**                     | Tách xử lý nặng khỏi luồng HTTP đồng bộ.                                                           |
+| Lớp                                    | Vai trò                                                                                   |
+| -------------------------------------- | ----------------------------------------------------------------------------------------- |
+| **Gateway / LB** (design-only)         | Là vị chí chủ chốt, rate limit và TLS gần biên mạng; bảo vệ trước khi request vào Server. |
+| **Ứng dụng API (`@nestjs/throttler`)** | Fixed window, giới hạn theo **IP client** trên toàn API và **siết thêm** ở một số route.  |
+| **Queue & worker**                     | Tách xử lý nặng khỏi luồng HTTP đồng bộ.                                                  |
 
-#### Bảng preset route (cửa sổ 60 giây)
+Do hiện tại chỉ có 1 server, Có thể cân nhắc hy sinh api của roles ngoài student, nhưng với thiết kế hiện tại chi cần ban quản lý không hoạt động cùng thời điểm với peak là được.
 
-| Endpoint / nhóm                                    | Giới hạn (limit / TTL) | Ghi chú                                  |
-| -------------------------------------------------- | ---------------------- | ---------------------------------------- |
-| `POST /auth/login/jwt`, `POST /auth/login/session` | **10** / 60s           | Giảm brute-force mật khẩu.               |
-| `GET /auth/me/jwt`, `POST /auth/refresh`           | **30** / 60s           | Giới hạn làm mới token quá dày.          |
-| `POST /registrations`                              | **20** / 60s           | Giảm spam đăng ký / enqueue kèm giữ chỗ. |
-| `POST /payments`                                   | **15** / 60s           | Giảm khởi tạo thanh toán lặp lại.        |
-| `POST /student-sync`                               | **5** / 60s            | Upload CSV đẩy job BullMQ.               |
+Không caching workshop (high read) do dữ liệu có thay đổi trong thời gian thực (số chỗ) và payload nhẹ (~ 100).
+
+Rate limit **theo IP** phù hợp trong kịch bản trường học.
 
 #### Hành vi khi vượt ngưỡng
 
-- Framework trả **HTTP 429** (Too Many Requests); client backoff / retry có jitter.
+Framework trả **HTTP 429** (Too Many Requests); client backoff / retry có jitter.
 
 #### Giới hạn thiết kế & hướng mở rộng
 
-- **Storage mặc định của `@nestjs/throttler` là in-memory trong process**: khi chạy **nhiều replica** API, mỗi instance có **bộ đếm riêng** — ngưỡng thực tế trên một IP ≈ nhân với số replica (trừ khi có sticky session luôn trúng một pod). Để đếm **chung giữa các instance**, có thể chuyển sang storage Redis (plugin / custom `ThrottlerStorage`) hoặc giữ rate limit chủ đạo tại **gateway**.
-- Rate limit **theo IP** không chặn được kịch bản **nhiều IP phân tán** (botnet); có thể chấp nhận trong kịch bản trường học.
+Storage mặc định của `@nestjs/throttler` là **in-memory trong process**: để đếm **chung giữa các instance** nếu hệ thống phân tán, có thể chuyển sang storage Redis.
 
 ### Xử lý cổng thanh toán không ổn định
 
 #### Giải pháp triển khai
 
-| Thành phần                  | Vai trò                                                                                                                                                                                                                                          |
-| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Circuit breaker (CB)**    | Theo dõi lỗi hạ tầng. Khi vượt ngưỡng → tạm **ngưng initiate** checkout (`POST /payments`) trong một khoảng thời gian.                                                                                                                           |
-| **Graceful degradation**    | Khi CB chặn hoặc **health probe** thất bại: có thể trả **HTTP 200** kèm payload “giảm chức năng” (`degraded`, `retryAfterSeconds`, `userMessage`) thay vì lỗi cứng.                                                                              |
-| **Health probe (tuỳ chọn)** | Trước khi vào nhánh initiate thật, có thể **GET** `PAYMENT_GATEWAY_HEALTHCHECK_URL`; **5xx**, **429**, timeout → đếm là **một lỗi hạ tầng** (`recordInfrastructureFailure`) và phản hồi graceful/block ngay request đó (không chờ đủ ngưỡng CB). |
-
-#### Luồng initiate và CB trong code (`POST /payments`)
-
-1. Kiểm tra nghiệp vụ (workshop có phí, payment/refund/reservation/reg.status…).
-2. `evaluateInitiateGate()` — nếu CB đang **Open** trong cửa sổ cooldown → trả degraded hoặc **503**, không probe và không tăng `attemptCount`.
-3. `optionalPaymentGatewayHealthProbe()` (chỉ khi có URL) — fail → `recordInfrastructureFailure()`và phản hồi degraded/block ngay (message probe +`retryAfterSeconds`), không bắt user chờ đủ threshold để biết cổng đang lỗi.
-4. `finalizePaymentSuccess` (đồng bộ hoặc webhook) gọi `recordCheckoutSuccess()` → reset CB về **Closed** và xóa đếm lỗi.
+| Thành phần               | Vai trò                                                                                                                       |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------- |
+| **Circuit breaker (CB)** | Theo dõi lỗi hạ tầng. Khi vượt ngưỡng → tạm **ngưng initiate** checkout (`POST /payments`) trong một khoảng thời gian.        |
+| **Graceful degradation** | Khi CB chặn: trả **HTTP 200** kèm payload “giảm chức năng” (`degraded`, `retryAfterSeconds`, `userMessage`) thay vì lỗi cứng. |
 
 #### Các trạng thái CB
 
@@ -435,7 +427,7 @@ Luồng trong `RolesGuard`:
      - `pending` + snapshot có **`redirectUrl`** → 200 cùng URL, không increment/mock session mới.
      - `pending` nhưng snapshot thiếu redirect hoặc lệch thực tế DB → **XÓA** key Redis, **retry initiate** như request mới (phòng cache hỏng hoặc state đổi).
 
-####  Giới hạn thiết kế & hướng mở rộng
+#### Giới hạn thiết kế & hướng mở rộng
 
 - Với cổng thanh toán production cần thêm **idempotency của provider** cho lệnh capture/debit — header này chỉ bọc initiate nội bộ + mock UX.
 - Session checkout **mock trong RAM** có TTL riêng; Redis replay có thể dài hơn — có thể cần **intent mới + key mới** nếu URL mock đã hết session nhưng key Redis vẫn đòi replay redirect cũ (xử lý sẽ có thể dẫn tới invalidate hoặc lỗi UI tùy cấu hình).
@@ -473,9 +465,9 @@ Luồng trong `RolesGuard`:
 
 - **Relational DB → PostgreSQL + Prisma**: hỗ trợ mạnh về các tính năng SQL như transaction, JSONB, CTE...
 - **In-memory store → Redis**: mặc định.
-- **Message broker → Redis Streams + BullMQ**: cân nhắc **RabbitMQ** nếu cần nhiều consumer routing pattern phức tạp hay quy mô phân tán mở rộng, **Kafka** nếu cần lưu lại lịch sử (thông báo) hoặc lưu dữ liệu stream.
+- **Message broker → Redis Streams + BullMQ**: do không có yêu cầu cụ thể luồng xử lý queue phức tạp; cân nhắc **RabbitMQ** nếu cần nhiều consumer routing pattern phức tạp hay quy mô phân tán mở rộng, **Kafka** nếu cần lưu lại lịch sử (thông báo) hoặc lưu dữ liệu stream.
 
-### Modular Monolith
+**Modular Monolith**
 
 - **Lựa chọn**: Một backend process duy nhất xây dựng bằng NestJS, được chia thành các module ánh xạ 1-1 với từng module nghiệp vụ.
 - **Tại sao**:
@@ -489,7 +481,7 @@ Luồng trong `RolesGuard`:
   - Khi hệ thống cần phục vụ tải lớn hơn nhiều so với hiện tại.
   - Module có quy mô và nhịp phát triển khác biệt rõ rệt.
 
-### Authentication
+**Authentication**
 
 - **Lựa chọn:**
   - JWT stateless cho web sinh viên.
@@ -502,7 +494,7 @@ Luồng trong `RolesGuard`:
   - Giảm thiểu bằng cách sử dụng access token có TTL ngắn (ví dụ 15 phút) kết hợp refresh token có thể revoke phía server.
 - **Thuật toán ký:** Sử dụng HS256 cho JWT trong kiến trúc monolith nhằm giữ triển khai đơn giản và dễ quản lý secret nội bộ.
 
-### Relational Database
+**Relational Database**
 
 - **Lựa chọn**: SQL với PostgreSQL.
 - **Tại sao**:
