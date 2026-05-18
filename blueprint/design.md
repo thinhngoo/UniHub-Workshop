@@ -351,13 +351,15 @@ Luồng trong `RolesGuard`:
 
 ### Kiểm soát tải đột biến
 
+#### Giải pháp triển khai
+
 **Chiến lược nhiều lớp** (thiết kế):
 
-| Lớp                                    | Vai trò                                                                                                                                                           |
-| -------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Gateway / LB**                       | Là vị chí chủ chốt, rate limit và TLS gần biên mạng; bảo vệ trước khi request vào Node.                                                                           |
-| **Ứng dụng API (`@nestjs/throttler`)** | Fixed window, giới hạn theo **IP client** trên toàn API và **siết thêm** trên từng route nhạy cảm.                                                                |
-| **Queue & worker**                     | Tách xử lý nặng (CSV, email, summary PDF, expiry giữ chỗ) khỏi luồng HTTP đồng bộ — spike HTTP không nhất thiết đồng nghĩa spike ghi DB đồng bộ cho mọi thao tác. |
+| Lớp                                    | Vai trò                                                                                            |
+| -------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| **Gateway / LB**                       | Là vị chí chủ chốt, rate limit và TLS gần biên mạng; bảo vệ trước khi request vào Node.            |
+| **Ứng dụng API (`@nestjs/throttler`)** | Fixed window, giới hạn theo **IP client** trên toàn API và **siết thêm** trên từng route nhạy cảm. |
+| **Queue & worker**                     | Tách xử lý nặng khỏi luồng HTTP đồng bộ.                                                           |
 
 #### Bảng preset route (cửa sổ 60 giây)
 
@@ -367,7 +369,7 @@ Luồng trong `RolesGuard`:
 | `GET /auth/me/jwt`, `POST /auth/refresh`           | **30** / 60s           | Giới hạn làm mới token quá dày.          |
 | `POST /registrations`                              | **20** / 60s           | Giảm spam đăng ký / enqueue kèm giữ chỗ. |
 | `POST /payments`                                   | **15** / 60s           | Giảm khởi tạo thanh toán lặp lại.        |
-| `POST /student-sync`                               | **5** / 60s            | Upload CSV đẩy job BullMQ — siết riêng.  |
+| `POST /student-sync`                               | **5** / 60s            | Upload CSV đẩy job BullMQ.               |
 
 #### Hành vi khi vượt ngưỡng
 
@@ -380,58 +382,47 @@ Luồng trong `RolesGuard`:
 
 ### Xử lý cổng thanh toán không ổn định
 
-#### Giải pháp triển khai (`PaymentGatewayCircuitBreakerService`)
+#### Giải pháp triển khai
 
 | Thành phần                  | Vai trò                                                                                                                                                                                                                                          |
 | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Circuit breaker (CB)**    | Theo dõi **lỗi hạ tầng** liên quan cổng (Redis key `payment_gateway:circuit:v1`). Khi vượt ngưỡng → tạm **ngưng initiate** checkout (`POST /payments`) trong một khoảng thời gian (trạng thái **Open**).                                         |
-| **Graceful degradation**    | Khi CB chặn hoặc **health probe** thất bại: có thể trả **HTTP 200** kèm payload “giảm chức năng” (`degraded`, `retryAfterSeconds`, `userMessage`) thay vì lỗi cứng. Tuỳ chọn **HTTP 503** khi tắt graceful.                                      |
+| **Circuit breaker (CB)**    | Theo dõi lỗi hạ tầng. Khi vượt ngưỡng → tạm **ngưng initiate** checkout (`POST /payments`) trong một khoảng thời gian.                                                                                                                           |
+| **Graceful degradation**    | Khi CB chặn hoặc **health probe** thất bại: có thể trả **HTTP 200** kèm payload “giảm chức năng” (`degraded`, `retryAfterSeconds`, `userMessage`) thay vì lỗi cứng.                                                                              |
 | **Health probe (tuỳ chọn)** | Trước khi vào nhánh initiate thật, có thể **GET** `PAYMENT_GATEWAY_HEALTHCHECK_URL`; **5xx**, **429**, timeout → đếm là **một lỗi hạ tầng** (`recordInfrastructureFailure`) và phản hồi graceful/block ngay request đó (không chờ đủ ngưỡng CB). |
 
 #### Luồng initiate và CB trong code (`POST /payments`)
 
 1. Kiểm tra nghiệp vụ (workshop có phí, payment/refund/reservation/reg.status…).
 2. `evaluateInitiateGate()` — nếu CB đang **Open** trong cửa sổ cooldown → trả degraded hoặc **503**, không probe và không tăng `attemptCount`.
-3. `**optionalPaymentGatewayHealthProbe()`** (chỉ khi có URL) — fail → `**recordInfrastructureFailure()\*\*`và phản hồi degraded/block ngay (message probe +`retryAfterSeconds`), không bắt user chờ đủ threshold để biết cổng đang lỗi.
-4. Nhánh **mock redirect** hoặc **finalize đồng bộ** — `**attemptCount` chỉ được increment sau khi đã qua (2)(3).
-5. `**finalizePaymentSuccess`** (đồng bộ hoặc webhook) gọi `**recordCheckoutSuccess()**` → reset CB về **Closed\*\* và xóa đếm lỗi.
+3. `optionalPaymentGatewayHealthProbe()` (chỉ khi có URL) — fail → `recordInfrastructureFailure()`và phản hồi degraded/block ngay (message probe +`retryAfterSeconds`), không bắt user chờ đủ threshold để biết cổng đang lỗi.
+4. `finalizePaymentSuccess` (đồng bộ hoặc webhook) gọi `recordCheckoutSuccess()` → reset CB về **Closed** và xóa đếm lỗi.
 
 #### Các trạng thái CB
 
 | Trạng thái    | Ý nghĩa                                                                                                                                                                              | Chuyển trạng thái (tóm tắt)                                                                       |
 | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------- |
 | **Closed**    | Cho phép initiate. Đếm `failures` khi có lỗi hạ tầng; **thanh toán hoàn tất thành công** → reset về Closed + `failures = 0`.                                                         | `failures ≥ threshold` → **Open** + ghi `openedAtMs`.                                             |
-| **Open**      | Trong `PAYMENT_GATEWAY_CB_RESET_MS` kể từ mở, initiate bị graceful hoặc 503.                                                                                                         | Hết cooldown → request đầu tiên đưa vào **Half-open** (ghi state Redis) và cho phép thử initiate. |
-| **Half-open** | Cho phép thử lại luồng initiate (probe + checkout). **Thành công** checkout (finalize / webhook OK) → **Closed** đầy đủ. **Lỗi hạ tầng** tiếp → **Open** lại (đặt `openedAtMs` mới). |
-
-#### Hành vi khi CB chặn
-
-- **Circuit đang Open (trong cooldown)** → `POST /payments`: không vào nhánh thanh toán; client nhận **200 degraded** hoặc **503** tuỳ `PAYMENT_GATEWAY_CB_GRACEFUL_RESPONSE`; **không** tăng `attemptCount` payment trong nhánh đó (gate chạy trước increment mock/sync).
-- **Probe fail** → một lần `recordInfrastructureFailure`; đồng thời phản hồi degraded/block với message kiểm tra sức khỏe cổng.
-- **Thanh toán thành công**: reset CB về Closed.
+| **Open**      | Trong `PAYMENT_GATEWAY_CB_RESET_MS` kể từ mở, initiate bị graceful hoặc **503**.                                                                                                     | Hết cooldown → request đầu tiên đưa vào **Half-open** (ghi state Redis) và cho phép thử initiate. |
+| **Half-open** | Cho phép thử lại luồng initiate (probe + checkout). **Thành công** checkout (finalize / webhook OK) → **Closed** đầy đủ. **Lỗi hạ tầng** tiếp → **Open** lại (đặt `openedAtMs` mới). |                                                                                                   |
 
 ### Chống trừ tiền hai lần
 
-**Mục tiêu**: tránh hai lần “bắt đầu thanh toán” cho cùng một ý định (double click, retry mạng, tab trùng) dẫn tới **tăng `attemptCount` hai lần**, **hai phiên checkout mock**, hoặc hai lần đẩy lệnh tới cổng thật sau này. **Định danh học sinh không bị debit hai lần** về mặt bản chất vẫn dựa trên **`payment.status = succeeded`** (webhook/sync finalize chỉ được phép một lần “settle”; idempotency ở đây bổ sung tầng **initiate UX + an toàn hạ tầng**).
+#### Giải pháp triển khai
 
-#### Cơ chế
+| Lớp                                       | Nội dung                                                                                                                                                                                                                                |
+| ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Idempotency-Key trên `POST /payments`** | Bắt buộc header `Idempotency-Key` (client giữ **cùng một key** cho mọi retry của **một intent**). API client bọc qua `withIdempotencyKey`.                                                                                              |
+| **Một intent → một snapshot Redis**       | Sau redirect mock hoặc **finalize đồng bộ**, lưu snapshot tối giản **`registrationId`**, **`redirectUrl`** (nullable).                                                                                                                  |
+| **Replay an toàn**                        | Cùng `(userId, Idempotency-Key)` và snapshot còn TTL → trả **cùng redirect** hoặc **succeeded đọc từ Postgres** — **không** cộng `attemptCount`, **không** tạo phiên checkout mới; luôn **đọc lại** row `payments` khớp `registration`. |
+| **Đăng ký (registration)**                | Workshop có phí: cột **`idempotency_key` UNIQUE** globale trong DB khi tạo payment lúc đăng ký — tách luồng **chống hai bản đăng ký hai payment** khỏi luồng **replay initiate**.                                                       |
 
-| Lớp | Nội dung |
-| --- | -------- |
-| **Idempotency-Key trên `POST /payments`** | Bắt buộc header `Idempotency-Key` (client giữ **cùng một key** cho mọi retry của **một intent**). API client bọc qua `withIdempotencyKey` (Web SV giữ key ở state trang thanh toán). |
-| **Một intent → một snapshot Redis** | Sau redirect mock hoặc **finalize đồng bộ**, lưu snapshot tối giản **`registrationId`**, **`redirectUrl`** (nullable). Tên Redis key dùng `userId` + **SHA-256** của giá trị header (không đặt nguyên key thô vào Redis key string). |
-| **Replay an toàn** | Cùng `(userId, Idempotency-Key)` và snapshot còn TTL → trả **cùng redirect** hoặc **succeeded đọc từ Postgres** — **không** cộng `attemptCount`, **không** tạo phiên checkout mới; luôn **đọc lại** row `payments` khớp `registration`. |
-| **Đăng ký (registration)** | Workshop có phí: cột **`idempotency_key` UNIQUE** globale trong DB khi tạo payment lúc đăng ký — tách luồng **chống hai bản đăng ký hai payment** khỏi luồng **replay initiate**. |
-
-#### Nơi lưu trữ
-
-- **Redis**: prefix `payment_init:idemp:v1:`. **Fail-open** khi ghi: thanh toán vẫn chạy; replay có thể tạm thời không dùng được.
-- **PostgreSQL**: nguồn sự thật **`payment.status`**, **`provider_txn_id`**, **`attempt_count`**; webhook/finalize idempotent không “trừ tiền” lần hai khi đã `succeeded`.
+- **Redis**: prefix `payment_init:idemp:v1:`. **Fail-open** khi ghi: thanh toán vẫn chạy; replay có thể tạm thời không dùng được. Ưu tiên khả dụng thanh toán hơn đảm bảo chặt chẽ của cache idempotency
+- **PostgreSQL**: bản gốc của hệ thống `payment.status`, `provider_txn_id`, **`attempt_count`**; webhook/finalize idempotent không “trừ tiền” lần hai khi đã `succeeded`.
 
 #### TTL
 
-- Env **`PAYMENT_INIT_IDEMPOTENCY_TTL_SECONDS`** (`src/apps/api/.env.example`; mặc định code **86400** giây) là trần TTL snapshot.
-- Có **`expires_at` giữ chỗ**: TTL tính = `min(trần cấu hình, max(300, giây còn đến hết chỗ + 120 đệm))`, rồi **tối thiểu 120** trong code TTL logic; khi `SET` vào Redis, `EX ≥ max(60, TTL)` — tránh TTL quá ngắn gây mất replay vô lý nhưng vẫn **không** kéo dài replay sau khi chỗ reservation hết hiệu lực (trừ đệm có chủ đích).
+- Env `PAYMENT_INIT_IDEMPOTENCY_TTL_SECONDS` (`src/apps/api/.env.example`; mặc định code **86400** giây) là trần TTL snapshot.
+- Có `expires_at` giữ chỗ: TTL tính = `min(trần cấu hình, max(300, giây còn đến hết chỗ + 120 đệm))`, rồi **tối thiểu 120** trong code TTL logic; khi `SET` vào Redis, `EX ≥ max(60, TTL)` — tránh TTL quá ngắn gây mất replay vô lý nhưng vẫn không kéo dài replay sau khi chỗ reservation hết hiệu lực (trừ đệm có chủ đích).
 
 #### Luồng xử lý khi phát hiện trùng lặp
 
@@ -444,12 +435,7 @@ Luồng trong `RolesGuard`:
      - `pending` + snapshot có **`redirectUrl`** → 200 cùng URL, không increment/mock session mới.
      - `pending` nhưng snapshot thiếu redirect hoặc lệch thực tế DB → **XÓA** key Redis, **retry initiate** như request mới (phòng cache hỏng hoặc state đổi).
 
-#### Thiếu / sai header
-
-- Thiếu `Idempotency-Key` (sau trim) → **400** `payment_init_idempotency_required`.
-- Key **> 191** ký tự → **400** `payment_init_idempotency_invalid`.
-
-#### Giới hạn / lưu ý
+####  Giới hạn thiết kế & hướng mở rộng
 
 - Với cổng thanh toán production cần thêm **idempotency của provider** cho lệnh capture/debit — header này chỉ bọc initiate nội bộ + mock UX.
 - Session checkout **mock trong RAM** có TTL riêng; Redis replay có thể dài hơn — có thể cần **intent mới + key mới** nếu URL mock đã hết session nhưng key Redis vẫn đòi replay redirect cũ (xử lý sẽ có thể dẫn tới invalidate hoặc lỗi UI tùy cấu hình).
